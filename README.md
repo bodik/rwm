@@ -43,3 +43,4 @@ RWM can:
 
 TBD:
 * unlike in other backup solutions, attacker with credentials can restore any old data from the repository/bucket
+* number of object files vs size
