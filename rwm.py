@@ -107,6 +107,17 @@ class RWM:
         }
         return subrun(["rclone"] + args, env=env, check=False).returncode
 
+    def restic_cmd(self, args):
+        env = {
+            "HOME": os.environ["HOME"],
+            "PATH": os.environ["PATH"],
+            "AWS_ACCESS_KEY_ID": self.config["S3_ACCESS_KEY"],
+            "AWS_SECRET_ACCESS_KEY": self.config["S3_SECRET_KEY"],
+            "RESTIC_PASSWORD": self.config["RES_PASSWORD"],
+            "RESTIC_REPOSITORY": f"s3:{self.config['S3_ENDPOINT_URL']}/{self.config['RES_BUCKET']}",
+        }
+        #--one-file-system
+        return subrun(["restic"] + args, env=env, check=False).returncode
 
 def main(argv=None, dict_config=None):
     """main"""
@@ -121,6 +132,8 @@ def main(argv=None, dict_config=None):
     rc_cmd_parser.add_argument("cmd_args", nargs="*")
     rcc_cmd_parser = subparsers.add_parser("rcc", help="rclone command with crypt overlay")
     rcc_cmd_parser.add_argument("cmd_args", nargs="*")
+    res_cmd_parser = subparsers.add_parser("res", help="restic command")
+    res_cmd_parser.add_argument("cmd_args", nargs="*")
 
     args = parser.parse_args(argv)
 
@@ -138,6 +151,8 @@ def main(argv=None, dict_config=None):
         return rwm.rclone_cmd(args.cmd_args)
     if args.command == "rcc":
         return rwm.rclone_crypt_cmd(args.cmd_args)
+    if args.command == "res":
+        return rwm.restic_cmd(args.cmd_args)
 
     return 0
 
