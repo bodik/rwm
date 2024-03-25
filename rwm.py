@@ -45,18 +45,17 @@ def run_command(*args, **kwargs):
         "encoding": "utf-8",
     })
     logger.debug("run_command, %s", (args, kwargs))
-    proc = subprocess.run(*args, **kwargs, check=False)
-    return (proc.returncode, proc.stdout, proc.stderr)
+    return subprocess.run(*args, **kwargs, check=False)
 
 
-def wrap_output(returncode, stdout, stderr):
+def wrap_output(process):
     """wraps command output and prints results"""
 
-    if stdout:
-        print(stdout)
-    if stderr:
-        print(stderr, file=sys.stderr)
-    return returncode
+    if process.stdout:
+        print(process.stdout)
+    if process.stderr:
+        print(process.stderr, file=sys.stderr)
+    return process.returncode
 
 
 def rclone_obscure_password(plaintext, iv=None):
@@ -81,13 +80,7 @@ class RWM:
         self.config = config
 
     def aws_cmd(self, args):
-        """
-        aws cli wrapper
-
-        :param list args: list passed to subprocess
-        :return: returncode, stdout, stderr
-        :rtype: tuple
-        """
+        """aws cli wrapper"""
 
         env = {
             "PATH": os.environ["PATH"],
@@ -103,13 +96,7 @@ class RWM:
         return run_command(["aws", "--endpoint-url", self.config["RWM_S3_ENDPOINT_URL"]] + args, env=env)
 
     def rclone_cmd(self, args):
-        """
-        rclone wrapper
-
-        :param list args: list passed to subprocess
-        :return: returncode, stdout, stderr
-        :rtype: tuple
-        """
+        """rclone wrapper"""
 
         env = {
             "RCLONE_CONFIG": "",
@@ -128,10 +115,6 @@ class RWM:
         rclone crypt wrapper
         * https://rclone.org/docs/#config-file
         * https://rclone.org/crypt/
-
-        :param list args: list passed to subprocess
-        :return: returncode, stdout, stderr
-        :rtype: tuple
         """
 
         env = {
@@ -190,13 +173,13 @@ def main(argv=None):
     rwm = RWM(config)
 
     if args.command == "aws":
-        return wrap_output(*rwm.aws_cmd(args.cmd_args))
+        return wrap_output(rwm.aws_cmd(args.cmd_args))
     if args.command == "rclone":
-        return wrap_output(*rwm.rclone_cmd(args.cmd_args))
+        return wrap_output(rwm.rclone_cmd(args.cmd_args))
     if args.command == "rclone_crypt":
-        return wrap_output(*rwm.rclone_crypt_cmd(args.cmd_args))
+        return wrap_output(rwm.rclone_crypt_cmd(args.cmd_args))
     if args.command == "restic":
-        return wrap_output(*rwm.restic_cmd(args.cmd_args))
+        return wrap_output(rwm.restic_cmd(args.cmd_args))
 
     return 0
 
