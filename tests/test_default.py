@@ -42,7 +42,7 @@ def test_main(tmpworkdir: str):  # pylint: disable=unused-argument
     # optional and default config hanling
     assert rwm_main([]) == 0
     Path("rwm.conf").touch()
-    assert rwm_main([]) == 0
+    assert rwm_main(["version"]) == 0
 
     # command branches
     mock = Mock(return_value=CompletedProcess(args='dummy', returncode=0))
