@@ -4,14 +4,19 @@
 import base64
 import logging
 import os
+import subprocess
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
-from subprocess import run as subrun
 
 import yaml
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+
+
+__version__ = "0.1"
+logger = logging.getLogger("rwm")
+logger.setLevel(logging.DEBUG)
 
 
 def is_sublist(needle, haystack):
@@ -29,6 +34,29 @@ def get_config(path):
     if Path(path).exists():
         return yaml.safe_load(Path(path).read_text(encoding='utf-8')) or {}
     return {}
+
+
+def run_command(*args, **kwargs):
+    """output capturing command executor"""
+
+    kwargs.update({
+        "capture_output": True,
+        "text": True,
+        "encoding": "utf-8",
+    })
+    logger.debug("run_command, %s", (args, kwargs))
+    proc = subprocess.run(*args, **kwargs, check=False)
+    return (proc.returncode, proc.stdout, proc.stderr)
+
+
+def wrap_output(returncode, stdout, stderr):
+    """wraps command output and prints results"""
+
+    if stdout:
+        print(stdout)
+    if stderr:
+        print(stderr, file=sys.stderr)
+    return returncode
 
 
 def rclone_obscure_password(plaintext, iv=None):
@@ -53,7 +81,13 @@ class RWM:
         self.config = config
 
     def aws_cmd(self, args):
-        """aws cli wrapper"""
+        """
+        aws cli wrapper
+
+        :param list args: list passed to subprocess
+        :return: returncode, stdout, stderr
+        :rtype: tuple
+        """
 
         env = {
             "PATH": os.environ["PATH"],
@@ -66,10 +100,16 @@ class RWM:
             env.update({"AWS_DEFAULT_REGION": ""})
 
         # aws cli does not have endpoint-url as env config option
-        return subrun(["aws", "--endpoint-url", self.config["S3_ENDPOINT_URL"]] + args, env=env, check=False).returncode
+        return run_command(["aws", "--endpoint-url", self.config["S3_ENDPOINT_URL"]] + args, env=env)
 
     def rclone_cmd(self, args):
-        """rclone wrapper"""
+        """
+        rclone wrapper
+
+        :param list args: list passed to subprocess
+        :return: returncode, stdout, stderr
+        :rtype: tuple
+        """
 
         env = {
             "RCLONE_CONFIG": "",
@@ -81,33 +121,39 @@ class RWM:
             "RCLONE_CONFIG_RWMBE_ENV_AUTH": "false",
             "RCLONE_CONFIG_RWMBE_REGION": "",
         }
-        return subrun(["rclone"] + args, env=env, check=False).returncode
+        return run_command(["rclone"] + args, env=env)
 
     def rclone_crypt_cmd(self, args):
         """
         rclone crypt wrapper
         * https://rclone.org/docs/#config-file
         * https://rclone.org/crypt/
+
+        :param list args: list passed to subprocess
+        :return: returncode, stdout, stderr
+        :rtype: tuple
         """
 
         env = {
             "RCLONE_CONFIG": "",
             "RCLONE_CONFIG_RWMBE_TYPE": "crypt",
-            "RCLONE_CONFIG_RWMBE_REMOTE": f"rwms3be:/{self.config['RCC_CRYPT_BUCKET']}",
+            "RCLONE_CONFIG_RWMBE_REMOTE": f"rwmbes3:/{self.config['RCC_CRYPT_BUCKET']}",
             "RCLONE_CONFIG_RWMBE_PASSWORD": rclone_obscure_password(self.config["RCC_CRYPT_PASSWORD"]),
             "RCLONE_CONFIG_RWMBE_PASSWORD2": rclone_obscure_password(self.config["RCC_CRYPT_PASSWORD"]),
 
-            "RCLONE_CONFIG_RWMS3BE_TYPE": "s3",
-            "RCLONE_CONFIG_RWMS3BE_ENDPOINT": self.config["S3_ENDPOINT_URL"],
-            "RCLONE_CONFIG_RWMS3BE_ACCESS_KEY_ID": self.config["S3_ACCESS_KEY"],
-            "RCLONE_CONFIG_RWMS3BE_SECRET_ACCESS_KEY": self.config["S3_SECRET_KEY"],
-            "RCLONE_CONFIG_RWMS3BE_PROVIDER": "Ceph",
-            "RCLONE_CONFIG_RWMS3BE_ENV_AUTH": "false",
-            "RCLONE_CONFIG_RWMS3BE_REGION": "",
+            "RCLONE_CONFIG_RWMBES3_TYPE": "s3",
+            "RCLONE_CONFIG_RWMBES3_ENDPOINT": self.config["S3_ENDPOINT_URL"],
+            "RCLONE_CONFIG_RWMBES3_ACCESS_KEY_ID": self.config["S3_ACCESS_KEY"],
+            "RCLONE_CONFIG_RWMBES3_SECRET_ACCESS_KEY": self.config["S3_SECRET_KEY"],
+            "RCLONE_CONFIG_RWMBES3_PROVIDER": "Ceph",
+            "RCLONE_CONFIG_RWMBES3_ENV_AUTH": "false",
+            "RCLONE_CONFIG_RWMBES3_REGION": "",
         }
-        return subrun(["rclone"] + args, env=env, check=False).returncode
+        return run_command(["rclone"] + args, env=env)
 
     def restic_cmd(self, args):
+        """restic command wrapper"""
+
         env = {
             "HOME": os.environ["HOME"],
             "PATH": os.environ["PATH"],
@@ -116,9 +162,10 @@ class RWM:
             "RESTIC_PASSWORD": self.config["RES_PASSWORD"],
             "RESTIC_REPOSITORY": f"s3:{self.config['S3_ENDPOINT_URL']}/{self.config['RES_BUCKET']}",
         }
-        return subrun(["restic"] + args, env=env, check=False).returncode
+        return run_command(["restic"] + args, env=env)
 
-def main(argv=None, dict_config=None):
+
+def main(argv=None):
     """main"""
 
     parser = ArgumentParser(description="restics3 worm manager")
@@ -127,11 +174,11 @@ def main(argv=None, dict_config=None):
     subparsers = parser.add_subparsers(title="commands", dest="command", required=False)
     aws_cmd_parser = subparsers.add_parser("aws", help="aws command")
     aws_cmd_parser.add_argument("cmd_args", nargs="*")
-    rc_cmd_parser = subparsers.add_parser("rc", help="rclone command")
+    rc_cmd_parser = subparsers.add_parser("rclone", help="rclone command")
     rc_cmd_parser.add_argument("cmd_args", nargs="*")
-    rcc_cmd_parser = subparsers.add_parser("rcc", help="rclone command with crypt overlay")
+    rcc_cmd_parser = subparsers.add_parser("rclone_crypt", help="rclone command with crypt overlay")
     rcc_cmd_parser.add_argument("cmd_args", nargs="*")
-    res_cmd_parser = subparsers.add_parser("res", help="restic command")
+    res_cmd_parser = subparsers.add_parser("restic", help="restic command")
     res_cmd_parser.add_argument("cmd_args", nargs="*")
 
     args = parser.parse_args(argv)
@@ -139,19 +186,17 @@ def main(argv=None, dict_config=None):
     config = {}
     if args.config:
         config.update(get_config(args.config))
-    if dict_config:
-        config.update(dict_config)
     # assert config ?
     rwm = RWM(config)
 
     if args.command == "aws":
-        return rwm.aws_cmd(args.cmd_args)
-    if args.command == "rc":
-        return rwm.rclone_cmd(args.cmd_args)
-    if args.command == "rcc":
-        return rwm.rclone_crypt_cmd(args.cmd_args)
-    if args.command == "res":
-        return rwm.restic_cmd(args.cmd_args)
+        return wrap_output(*rwm.aws_cmd(args.cmd_args))
+    if args.command == "rclone":
+        return wrap_output(*rwm.rclone_cmd(args.cmd_args))
+    if args.command == "rclone_crypt":
+        return wrap_output(*rwm.rclone_crypt_cmd(args.cmd_args))
+    if args.command == "restic":
+        return wrap_output(*rwm.restic_cmd(args.cmd_args))
 
     return 0
 
