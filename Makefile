@@ -1,7 +1,7 @@
 all: lint
 
 install:
-	apt-get -y install awscli make python3-cryptography rclone yamllint
+	apt-get -y install awscli make python3-cryptography rclone restic yamllint
 
 venv:
 	apt-get -y install python3-venv

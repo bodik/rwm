@@ -69,6 +69,13 @@ rwm rcc lsl rwmbe:/
 
 ### Notes
 
+* https://rclone.org/commands/rclone_sync/
+
+It is always the contents of the directory that is synced, not the directory itself.
+So when source:path is a directory, it's the contents of source:path that are copied,
+not the directory name and contents. See extended explanation in the copy command if unsure.
+
+
 * corect, fails to download corrupted files
 ```
 root@bacula-test:/opt/rwm# ./rwm.py rcc copy rwmbe:/testfile.txt .

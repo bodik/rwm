@@ -116,7 +116,6 @@ class RWM:
             "RESTIC_PASSWORD": self.config["RES_PASSWORD"],
             "RESTIC_REPOSITORY": f"s3:{self.config['S3_ENDPOINT_URL']}/{self.config['RES_BUCKET']}",
         }
-        #--one-file-system
         return subrun(["restic"] + args, env=env, check=False).returncode
 
 def main(argv=None, dict_config=None):
