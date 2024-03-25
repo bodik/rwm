@@ -4,6 +4,7 @@
 import base64
 import logging
 import os
+import shlex
 import subprocess
 import sys
 from argparse import ArgumentParser
@@ -16,7 +17,7 @@ from cryptography.hazmat.backends import default_backend
 
 __version__ = "0.2"
 logger = logging.getLogger("rwm")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 def is_sublist(needle, haystack):
@@ -44,7 +45,7 @@ def run_command(*args, **kwargs):
         "text": True,
         "encoding": "utf-8",
     })
-    logger.debug("run_command, %s", (args, kwargs))
+    logger.debug("run_command: %s", shlex.join(args[0]))
     return subprocess.run(*args, **kwargs, check=False)
 
 
@@ -147,14 +148,69 @@ class RWM:
         }
         return run_command(["restic"] + args, env=env)
 
+    def backup(self, name):
+        """do restic backup from config"""
 
-def main(argv=None):
-    """main"""
+        if self.restic_cmd(["cat", "config"]).returncode != 0:
+            if (proc := self.restic_cmd(["init"])).returncode != 0:
+                logger.error("failed to autoinitialize restic repository")
+                return proc
+
+        conf = self.config["RWM_BACKUPS"][name]
+
+        # restic backup
+        excludes = conf.get("excludes", [])
+        excludes = [x for pair in zip(["--exclude"] * len(excludes), excludes) for x in pair]
+        extras = conf.get("extras", [])
+        cmd_args = ["backup"] + extras + excludes + conf["filesdirs"]
+
+        logger.info("running backup")
+        backup_proc = self.restic_cmd(cmd_args)
+        wrap_output(backup_proc)
+        if backup_proc.returncode != 0:
+            logger.error("backup failed, %s", backup_proc)
+            return backup_proc
+
+        # restic forget prune
+        keeps = []
+        for key, val in self.config.get("RWM_RETENTION", {}).items():
+            keeps += [f"--{key}", val]
+        if not keeps:
+            logger.error("no retention policy found")
+        cmd_args = ["forget", "--prune"] + keeps
+
+        logger.info("running forget prune")
+        forget_proc = self.restic_cmd(cmd_args)
+        wrap_output(forget_proc)
+        if forget_proc.returncode != 0:
+            logger.error("forget prune failed, %s", forget_proc)
+            return forget_proc
+
+        return backup_proc
+
+
+def configure_logging(debug):
+    """configure logger"""
+
+    log_handler = logging.StreamHandler(sys.stdout)
+    log_handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s %(name)s[%(process)d]: %(levelname)s %(message)s"
+        )
+    )
+    logger.addHandler(log_handler)
+    if debug:  # pragma: no cover  ; would reconfigure pylint environment
+        logger.setLevel(logging.DEBUG)
+
+
+def parse_arguments(argv):
+    """parse arguments"""
 
     parser = ArgumentParser(description="restics3 worm manager")
+    parser.add_argument("--debug", action="store_true")
     parser.add_argument("--config", default="rwm.conf")
-    subparsers = parser.add_subparsers(title="commands", dest="command", required=False)
 
+    subparsers = parser.add_subparsers(title="commands", dest="command", required=False)
     subparsers.add_parser("version", help="show version")
     aws_cmd_parser = subparsers.add_parser("aws", help="aws command")
     aws_cmd_parser.add_argument("cmd_args", nargs="*")
@@ -164,27 +220,43 @@ def main(argv=None):
     rcc_cmd_parser.add_argument("cmd_args", nargs="*")
     res_cmd_parser = subparsers.add_parser("restic", help="restic command")
     res_cmd_parser.add_argument("cmd_args", nargs="*")
+    backup_cmd_parser = subparsers.add_parser("backup", help="backup command")
+    backup_cmd_parser.add_argument("name", help="backup config name")
 
-    args = parser.parse_args(argv)
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    """main"""
+
+    args = parse_arguments(argv)
+    configure_logging(args.debug)
 
     config = {}
     if args.config:
         config.update(get_config(args.config))
+    logger.debug("config, %s", config)
     # assert config ?
     rwmi = RWM(config)
 
     if args.command == "version":
         print(__version__)
-    if args.command == "aws":
-        return wrap_output(rwmi.aws_cmd(args.cmd_args))
-    if args.command == "rclone":
-        return wrap_output(rwmi.rclone_cmd(args.cmd_args))
-    if args.command == "rclone_crypt":
-        return wrap_output(rwmi.rclone_crypt_cmd(args.cmd_args))
-    if args.command == "restic":
-        return wrap_output(rwmi.restic_cmd(args.cmd_args))
+        return 0
 
-    return 0
+    ret = -1
+    if args.command == "aws":
+        ret = wrap_output(rwmi.aws_cmd(args.cmd_args))
+    if args.command == "rclone":
+        ret = wrap_output(rwmi.rclone_cmd(args.cmd_args))
+    if args.command == "rclone_crypt":
+        ret = wrap_output(rwmi.rclone_crypt_cmd(args.cmd_args))
+    if args.command == "restic":
+        ret = wrap_output(rwmi.restic_cmd(args.cmd_args))
+    if args.command == "backup":
+        ret = rwmi.backup(args.name).returncode
+
+    logger.info("rwm finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
+    return ret
 
 
 if __name__ == "__main__":  # pragma: nocover

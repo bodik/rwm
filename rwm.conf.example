@@ -1,9 +1,16 @@
+# all commands
 RWM_S3_ENDPOINT_URL: ""
 RWM_S3_ACCESS_KEY: ""
 RWM_S3_SECRET_KEY: ""
 
+# rclone_crypt
 RWM_RCLONE_CRYPT_BUCKET: "rwmcrypt"
 RWM_RCLONE_CRYPT_PASSWORD: ""
 
+# restic, backup
 RWM_RESTIC_BUCKET: "rwmcrypt"
 RWM_RESTIC_PASSWORD: ""
+
+# backup
+RWM_BACKUPS: []
+RWM_RETENTION: []
