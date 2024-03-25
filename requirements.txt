@@ -1,5 +1,5 @@
 # runtime
-pycryptodome
+cryptography
 
 # dev
 flake8

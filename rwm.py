@@ -10,8 +10,8 @@ from pathlib import Path
 from subprocess import run as subrun
 
 import yaml
-from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 
 
 def is_sublist(needle, haystack):
@@ -36,11 +36,13 @@ def rclone_obscure_password(plaintext, iv=None):
 
     # https://github.com/rclone/rclone/blob/master/fs/config/obscure/obscure.go
     # https://github.com/maaaaz/rclonedeobscure
+    # GTP translate to python cryptography
+
     secret_key = b"\x9c\x93\x5b\x48\x73\x0a\x55\x4d\x6b\xfd\x7c\x63\xc8\x86\xa9\x2b\xd3\x90\x19\x8e\xb8\x12\x8a\xfb\xf4\xde\x16\x2b\x8b\x95\xf6\x38"
     if not iv:
-        iv = get_random_bytes(AES.block_size)
-    cipher = AES.new(key=secret_key, mode=AES.MODE_CTR, initial_value=iv, nonce=b'')
-    data = iv + cipher.encrypt(plaintext.encode())
+        iv = os.urandom(16)
+    encryptor = Cipher(algorithms.AES(secret_key), modes.CTR(iv), backend=default_backend()).encryptor()
+    data = iv + encryptor.update(plaintext.encode()) + encryptor.finalize()
     return base64.urlsafe_b64encode(data).decode().rstrip("=")
 
 

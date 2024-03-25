@@ -1,13 +1,20 @@
 all: lint
 
 install:
-	apt-get -y install awscli make rclone yamllint
+	apt-get -y install awscli make python3-cryptography rclone yamllint
 
 venv:
 	apt-get -y install python3-venv
 	python3 -m venv venv
 	venv/bin/pip install -U pip
 	venv/bin/pip install -r requirements.lock
+
+venv-refresh:
+	apt-get -y install python3-venv
+	rm -r venv
+	python3 -m venv venv
+	venv/bin/pip install -U pip
+	venv/bin/pip install -r requirements.txt
 
 freeze:
 	@pip freeze | grep -v '^pkg[-_]resources='
