@@ -153,9 +153,9 @@ def main(argv=None):
 
     parser = ArgumentParser(description="restics3 worm manager")
     parser.add_argument("--config", default="rwm.conf")
-
     subparsers = parser.add_subparsers(title="commands", dest="command", required=False)
-    version_cmd_parser = subparsers.add_parser("version", help="show version")
+
+    subparsers.add_parser("version", help="show version")
     aws_cmd_parser = subparsers.add_parser("aws", help="aws command")
     aws_cmd_parser.add_argument("cmd_args", nargs="*")
     rc_cmd_parser = subparsers.add_parser("rclone", help="rclone command")

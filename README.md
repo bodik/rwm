@@ -47,38 +47,69 @@ TBD:
 
 
 ## Install
-
 ```
 git clone git@gitlab.flab.cesnet.cz:bodik/rwm.git /opt/rwm
 cd /opt/rwm
-make venv
 make install
 ```
 
+## Development
+```
+git clone git@gitlab.flab.cesnet.cz:bodik/rwm.git /opt/rwm
+cd /opt/rwm
+make install
+make venv
+. venv/bin/activate
+```
 
 ## simple copy: rclone with crypt overlay
 
-* s3 + crypt overlay
+```
+cat > rwm.conf <<__EOF__
+RWM_S3_ENDPOINT_URL: ""
+RWM_S3_ACCESS_KEY: ""
+RWM_S3_SECRET_KEY: ""
+RWM_RCLONE_CRYPT_BUCKET: "rwmcrypt"
+RWM_RCLONE_CRYPT_PASSWORD: ""
+__EOF__
+rwm rclone_crypt sync /data rwmbe:/
+rwm rclone_crypt lsl rwmbe:/
+```
+
+
+## restic: restic backup
 
 ```
-cp rwm.conf.example rwm.conf
-edit rwm.conf
-rwm rcc sync /data rwmbe:/
-rwm rcc lsl rwmbe:/
+cat > rwm.conf <<__EOF__
+RWM_S3_ENDPOINT_URL: ""
+RWM_S3_ACCESS_KEY: ""
+RWM_S3_SECRET_KEY: ""
+RWM_RESTIC_BUCKET: "rwmrestic"
+RWM_RESTIC_PASSWORD: ""
+__EOF__
+rwm restic init
+rwm restic backup /data
+rwm restic snapshots
 ```
+
 
 ### Notes
 
+### Passing arguments
+
+Passthrough full arguments to underlyin tool with "--" (eg. `rwm rclone -- ls --help`).
+
+### rclone sync
 * https://rclone.org/commands/rclone_sync/
 
 It is always the contents of the directory that is synced, not the directory itself.
 So when source:path is a directory, it's the contents of source:path that are copied,
 not the directory name and contents. See extended explanation in the copy command if unsure.
 
+### rclone crypt
 
 * corect, fails to download corrupted files
 ```
-root@bacula-test:/opt/rwm# ./rwm.py rcc copy rwmbe:/testfile.txt .
 2024/03/23 16:54:31 ERROR : testfile.txt: Failed to copy: failed to open source object: not an encrypted file - bad magic string
 2024/03/23 16:54:31 ERROR : Attempt 1/3 failed with 1 errors and: failed to open source object: not an encrypted file - bad magic string
 ```
