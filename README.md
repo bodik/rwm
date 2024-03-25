@@ -39,3 +39,7 @@ RWM can:
 * ??? check completeness of the current state of the bucket
 
 * prune all non-recent object versions to reclaim storage space
+
+
+TBD:
+* unlike in other backup solutions, attacker with credentials can restore any old data from the repository/bucket
