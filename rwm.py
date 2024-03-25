@@ -68,12 +68,19 @@ class RWM:
         # aws cli does not have endpoint-url as env config option
         return subrun(["aws", "--endpoint-url", self.config["S3_ENDPOINT_URL"]] + args, env=env, check=False).returncode
 
+    @staticmethod
+    def _rclone_validate_args(args):
+        """rclone args helper"""
+
+        if (not any(x.startswith("rwmbe:") for x in args)) and all(x != "help" for x in args):
+            logging.error("rclone command missing 'rwmbe:' backend specification")
+            return False
+        return True
+
     def rclone_cmd(self, args):
         """rclone wrapper"""
 
-        # ensure command uses expected backend
-        if (not any(x.startswith("rwmbe:") for x in args)) and all(x != "help" for x in args):
-            logging.error("rclone command missing 'rwmbe:' backend specification")
+        if not self._rclone_validate_args(args):
             return 1
 
         env = {
@@ -95,9 +102,7 @@ class RWM:
         * https://rclone.org/crypt/
         """
 
-        # ensure command uses expected backend
-        if not any(x.startswith("rwmbe:") for x in args):
-            logging.error("rclone command missing 'rwmbe:' backend specification")
+        if not self._rclone_validate_args(args):
             return 1
 
         env = {
