@@ -1,0 +1,6 @@
+__pycache__/
+.coverage
+.vscode/
+rwm.conf
+testfile*
+venv/

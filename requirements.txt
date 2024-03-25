@@ -1,0 +1,11 @@
+# runtime
+pycryptodome
+
+# dev
+flake8
+coverage
+moto[server]
+pytest
+pytest-xprocess
+pylint
+pytest

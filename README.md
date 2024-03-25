@@ -44,3 +44,39 @@ RWM can:
 TBD:
 * unlike in other backup solutions, attacker with credentials can restore any old data from the repository/bucket
 * number of object files vs size
+
+
+## Install
+
+```
+git clone git@gitlab.flab.cesnet.cz:bodik/rwm.git /opt/rwm
+cd /opt/rwm
+make venv
+make install
+```
+
+
+## simple copy: rclone with crypt overlay
+
+* s3 + crypt overlay
+
+```
+cp rwm.conf.example rwm.conf
+edit rwm.conf
+rwm rcc sync /data rwmbe:/
+rwm rcc lsl rwmbe:/
+```
+
+### Notes
+
+* corect, fails to download corrupted files
+```
+root@bacula-test:/opt/rwm# ./rwm.py rcc copy rwmbe:/testfile.txt .
+2024/03/23 16:54:31 ERROR : testfile.txt: Failed to copy: failed to open source object: not an encrypted file - bad magic string
+2024/03/23 16:54:31 ERROR : Attempt 1/3 failed with 1 errors and: failed to open source object: not an encrypted file - bad magic string
+```
+
+* corect, skips bad filenames
+```
+2024/03/23 16:53:56 DEBUG : 6p78fe3tlp5o7ngi241jsjl2qX: Skipping undecryptable file name: illegal base32 data at input byte 25
+```
