@@ -170,16 +170,16 @@ def main(argv=None):
     if args.config:
         config.update(get_config(args.config))
     # assert config ?
-    rwm = RWM(config)
+    rwmi = RWM(config)
 
     if args.command == "aws":
-        return wrap_output(rwm.aws_cmd(args.cmd_args))
+        return wrap_output(rwmi.aws_cmd(args.cmd_args))
     if args.command == "rclone":
-        return wrap_output(rwm.rclone_cmd(args.cmd_args))
+        return wrap_output(rwmi.rclone_cmd(args.cmd_args))
     if args.command == "rclone_crypt":
-        return wrap_output(rwm.rclone_crypt_cmd(args.cmd_args))
+        return wrap_output(rwmi.rclone_crypt_cmd(args.cmd_args))
     if args.command == "restic":
-        return wrap_output(rwm.restic_cmd(args.cmd_args))
+        return wrap_output(rwmi.restic_cmd(args.cmd_args))
 
     return 0
 
