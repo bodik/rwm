@@ -2,9 +2,11 @@
 
 from pathlib import Path
 from textwrap import dedent
+from unittest.mock import Mock, patch
 
 import boto3
-from rwm import is_sublist, main as rwm_main, rclone_obscure_password, RWM
+import rwm
+from rwm import is_sublist, main as rwm_main, rclone_obscure_password, RWM, wrap_output
 
 
 def buckets_plain_list(full_response):
@@ -27,44 +29,34 @@ def test_sublist():
     assert not is_sublist([1, 3], [5, 4, 1, 2, 3, 6, 7])
 
 
+def test_wrap_output():
+    """test wrap_output"""
+
+    assert wrap_output(11, "dummy", "dummy") == 11
+
+
 def test_main(tmpworkdir: str):  # pylint: disable=unused-argument
     """test main"""
 
+    # optional and default config hanling
+    assert rwm_main([]) == 0
+    Path("rwm.conf").touch()
     assert rwm_main([]) == 0
 
-    Path("rwm.conf").write_text(
-        dedent("""
-            S3_ENDPOINT_URL: "dummy"
-            S3_ACCESS_KEY: "dummy"
-            S3_SECRET_KEY: "dummy"
-
-            RCC_CRYPT_BUCKET: "dummy-nasbackup-test1"
-            RCC_CRYPT_PASSWORD: "dummy"
-
-            RES_BUCKET: "dummy"
-            RES_PASSWORD: "dummy"
-        """),
-        encoding="utf-8"
-    )
-
-    assert rwm_main([]) == 0
-
-    assert rwm_main(["aws", "--", "--version"]) == 0
-    assert rwm_main(["aws", "notexist"]) != 0
-
-    assert rwm_main(["rclone", "version"]) == 0
-    assert rwm_main(["rclone_crypt", "version"]) == 0
-
-    assert rwm_main(["restic", "version"]) == 0
+    # command branches
+    mock = Mock(return_value=(0, "", ""))
+    for item in ["aws", "rclone", "rclone_crypt", "restic"]:
+        with patch.object(rwm.RWM, f"{item}_cmd", mock):
+            assert rwm_main([item]) == 0
 
 
 def test_aws_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
     """test aws command"""
 
     rwm = RWM({
-        "S3_ENDPOINT_URL": motoserver,
-        "S3_ACCESS_KEY": "dummy",
-        "S3_SECRET_KEY": "dummy",
+        "RWM_S3_ENDPOINT_URL": motoserver,
+        "RWM_S3_ACCESS_KEY": "dummy",
+        "RWM_S3_SECRET_KEY": "dummy",
     })
     s3 = boto3.client('s3', endpoint_url=motoserver, aws_access_key_id="dummy", aws_secret_access_key="dummy")
     test_bucket = "testbucket"
@@ -82,9 +74,9 @@ def test_rclone_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused
     """test rclone command"""
 
     rwm = RWM({
-        "S3_ENDPOINT_URL": motoserver,
-        "S3_ACCESS_KEY": "dummy",
-        "S3_SECRET_KEY": "dummy",
+        "RWM_S3_ENDPOINT_URL": motoserver,
+        "RWM_S3_ACCESS_KEY": "dummy",
+        "RWM_S3_SECRET_KEY": "dummy",
     })
     s3 = boto3.client('s3', endpoint_url=motoserver, aws_access_key_id="dummy", aws_secret_access_key="dummy")
 
@@ -102,11 +94,11 @@ def test_rclone_crypt_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=
     """test rclone with crypt overlay"""
 
     rwm = RWM({
-        "S3_ENDPOINT_URL": motoserver,
-        "S3_ACCESS_KEY": "dummy",
-        "S3_SECRET_KEY": "dummy",
-        "RCC_CRYPT_BUCKET": "cryptdata_test",
-        "RCC_CRYPT_PASSWORD": rclone_obscure_password("dummydummydummydummydummydummydummydummy"),
+        "RWM_S3_ENDPOINT_URL": motoserver,
+        "RWM_S3_ACCESS_KEY": "dummy",
+        "RWM_S3_SECRET_KEY": "dummy",
+        "RWM_RCLONE_CRYPT_BUCKET": "cryptdata_test",
+        "RWM_RCLONE_CRYPT_PASSWORD": rclone_obscure_password("dummydummydummydummydummydummydummydummy"),
     })
     s3 = boto3.client('s3', endpoint_url=motoserver, aws_access_key_id="dummy", aws_secret_access_key="dummy")
 
@@ -115,19 +107,19 @@ def test_rclone_crypt_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=
     Path(test_file).write_text('1234', encoding='utf-8')
 
     rwm.rclone_crypt_cmd(["copy", test_file, f"rwmbe:/{test_bucket}/"])
-    assert len(objects_plain_list(s3.list_objects_v2(Bucket=rwm.config["RCC_CRYPT_BUCKET"]))) == 1
+    assert len(objects_plain_list(s3.list_objects_v2(Bucket=rwm.config["RWM_RCLONE_CRYPT_BUCKET"]))) == 1
 
     rwm.rclone_crypt_cmd(["delete", f"rwmbe:/{test_bucket}/{test_file}"])
-    assert s3.list_objects_v2(Bucket=rwm.config["RCC_CRYPT_BUCKET"])["KeyCount"] == 0
+    assert s3.list_objects_v2(Bucket=rwm.config["RWM_RCLONE_CRYPT_BUCKET"])["KeyCount"] == 0
 
     test_file1 = "testfile1.txt"
     Path(test_file1).write_text('4321', encoding='utf-8')
     rwm.rclone_crypt_cmd(["sync", ".", f"rwmbe:/{test_bucket}/"])
-    assert s3.list_objects_v2(Bucket=rwm.config["RCC_CRYPT_BUCKET"])["KeyCount"] == 2
+    assert s3.list_objects_v2(Bucket=rwm.config["RWM_RCLONE_CRYPT_BUCKET"])["KeyCount"] == 2
 
     Path(test_file1).unlink()
     rwm.rclone_crypt_cmd(["sync", ".", f"rwmbe:/{test_bucket}/"])
-    assert s3.list_objects_v2(Bucket=rwm.config["RCC_CRYPT_BUCKET"])["KeyCount"] == 1
+    assert s3.list_objects_v2(Bucket=rwm.config["RWM_RCLONE_CRYPT_BUCKET"])["KeyCount"] == 1
 
 
 # def test_restic_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument

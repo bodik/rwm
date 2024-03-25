@@ -92,15 +92,15 @@ class RWM:
         env = {
             "PATH": os.environ["PATH"],
             "AWS_METADATA_SERVICE_NUM_ATTEMPTS": "0",
-            "AWS_ACCESS_KEY_ID": self.config["S3_ACCESS_KEY"],
-            "AWS_SECRET_ACCESS_KEY": self.config["S3_SECRET_KEY"]
+            "AWS_ACCESS_KEY_ID": self.config["RWM_S3_ACCESS_KEY"],
+            "AWS_SECRET_ACCESS_KEY": self.config["RWM_S3_SECRET_KEY"]
         }
         if is_sublist(["s3", "mb"], args):
             # region must be set and empty for awscil >=2.x and ?du? ceph s3
             env.update({"AWS_DEFAULT_REGION": ""})
 
         # aws cli does not have endpoint-url as env config option
-        return run_command(["aws", "--endpoint-url", self.config["S3_ENDPOINT_URL"]] + args, env=env)
+        return run_command(["aws", "--endpoint-url", self.config["RWM_S3_ENDPOINT_URL"]] + args, env=env)
 
     def rclone_cmd(self, args):
         """
@@ -114,9 +114,9 @@ class RWM:
         env = {
             "RCLONE_CONFIG": "",
             "RCLONE_CONFIG_RWMBE_TYPE": "s3",
-            "RCLONE_CONFIG_RWMBE_ENDPOINT": self.config["S3_ENDPOINT_URL"],
-            "RCLONE_CONFIG_RWMBE_ACCESS_KEY_ID": self.config["S3_ACCESS_KEY"],
-            "RCLONE_CONFIG_RWMBE_SECRET_ACCESS_KEY": self.config["S3_SECRET_KEY"],
+            "RCLONE_CONFIG_RWMBE_ENDPOINT": self.config["RWM_S3_ENDPOINT_URL"],
+            "RCLONE_CONFIG_RWMBE_ACCESS_KEY_ID": self.config["RWM_S3_ACCESS_KEY"],
+            "RCLONE_CONFIG_RWMBE_SECRET_ACCESS_KEY": self.config["RWM_S3_SECRET_KEY"],
             "RCLONE_CONFIG_RWMBE_PROVIDER": "Ceph",
             "RCLONE_CONFIG_RWMBE_ENV_AUTH": "false",
             "RCLONE_CONFIG_RWMBE_REGION": "",
@@ -137,14 +137,14 @@ class RWM:
         env = {
             "RCLONE_CONFIG": "",
             "RCLONE_CONFIG_RWMBE_TYPE": "crypt",
-            "RCLONE_CONFIG_RWMBE_REMOTE": f"rwmbes3:/{self.config['RCC_CRYPT_BUCKET']}",
-            "RCLONE_CONFIG_RWMBE_PASSWORD": rclone_obscure_password(self.config["RCC_CRYPT_PASSWORD"]),
-            "RCLONE_CONFIG_RWMBE_PASSWORD2": rclone_obscure_password(self.config["RCC_CRYPT_PASSWORD"]),
+            "RCLONE_CONFIG_RWMBE_REMOTE": f"rwmbes3:/{self.config['RWM_RCLONE_CRYPT_BUCKET']}",
+            "RCLONE_CONFIG_RWMBE_PASSWORD": rclone_obscure_password(self.config["RWM_RCLONE_CRYPT_PASSWORD"]),
+            "RCLONE_CONFIG_RWMBE_PASSWORD2": rclone_obscure_password(self.config["RWM_RCLONE_CRYPT_PASSWORD"]),
 
             "RCLONE_CONFIG_RWMBES3_TYPE": "s3",
-            "RCLONE_CONFIG_RWMBES3_ENDPOINT": self.config["S3_ENDPOINT_URL"],
-            "RCLONE_CONFIG_RWMBES3_ACCESS_KEY_ID": self.config["S3_ACCESS_KEY"],
-            "RCLONE_CONFIG_RWMBES3_SECRET_ACCESS_KEY": self.config["S3_SECRET_KEY"],
+            "RCLONE_CONFIG_RWMBES3_ENDPOINT": self.config["RWM_S3_ENDPOINT_URL"],
+            "RCLONE_CONFIG_RWMBES3_ACCESS_KEY_ID": self.config["RWM_S3_ACCESS_KEY"],
+            "RCLONE_CONFIG_RWMBES3_SECRET_ACCESS_KEY": self.config["RWM_S3_SECRET_KEY"],
             "RCLONE_CONFIG_RWMBES3_PROVIDER": "Ceph",
             "RCLONE_CONFIG_RWMBES3_ENV_AUTH": "false",
             "RCLONE_CONFIG_RWMBES3_REGION": "",
@@ -157,10 +157,10 @@ class RWM:
         env = {
             "HOME": os.environ["HOME"],
             "PATH": os.environ["PATH"],
-            "AWS_ACCESS_KEY_ID": self.config["S3_ACCESS_KEY"],
-            "AWS_SECRET_ACCESS_KEY": self.config["S3_SECRET_KEY"],
-            "RESTIC_PASSWORD": self.config["RES_PASSWORD"],
-            "RESTIC_REPOSITORY": f"s3:{self.config['S3_ENDPOINT_URL']}/{self.config['RES_BUCKET']}",
+            "AWS_ACCESS_KEY_ID": self.config["RWM_S3_ACCESS_KEY"],
+            "AWS_SECRET_ACCESS_KEY": self.config["RWM_S3_SECRET_KEY"],
+            "RESTIC_PASSWORD": self.config["RWM_RESTIC_PASSWORD"],
+            "RESTIC_REPOSITORY": f"s3:{self.config['RWM_S3_ENDPOINT_URL']}/{self.config['RWM_RESTIC_BUCKET']}",
         }
         return run_command(["restic"] + args, env=env)
 
