@@ -18,7 +18,7 @@ from cryptography.hazmat.backends import default_backend
 from tabulate import tabulate
 
 
-__version__ = "0.2"
+__version__ = "0.3"
 logger = logging.getLogger("rwm")
 logger.setLevel(logging.INFO)
 
