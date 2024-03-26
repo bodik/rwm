@@ -1,5 +1,7 @@
 # RWM - Restic WORM Manager
 
+## The story
+
 Restic is a fast and secure backup program. Uses client-storage architecture to backup
 local filesystem to the variety of backends including local and remote storages such
 as S3. Given it's server-less nature, a backed-up resource has ability to manipulate it's
@@ -26,18 +28,21 @@ credentials for the managed bucket.
 
 RWM can:
 
-* check if used bucket is configured for versioning
+* provide low-level S3 access for aws cli, rclone
+* rclone crypt over S3 backend
+* restic with S3 repository
+* configurable backup manager/executor
 
+
+todo:
+
+* check if used bucket is configured for versioning
 * check if used access_key does not have administrator privileges to manipulate
   with WORM policies
-
 * generate and store current bucket state state-data
-
 * recreate bucket contents on local filesystem (or remote bucket) acording to specified
   state data
-
 * ??? check completeness of the current state of the bucket
-
 * prune all non-recent object versions to reclaim storage space
 
 
@@ -48,30 +53,29 @@ TBD:
 
 ## Usage
 
-Beside the WORM management features, `rwm` can also be used as simple wrapper to other S3 related
-tools such as `aws` CLI, `rclone` and `restic`.
-
-It can be also used as simple backup manager for intended usecases.
-
-
 ### Install
 ```
-git clone git@gitlab.flab.cesnet.cz:bodik/rwm.git /opt/rwm
+git clone git@gitlab.cesnet.cz:radoslav_bodo/rwm.git /opt/rwm
 cd /opt/rwm
 make install
 ```
 
-### Simple copy: rclone with crypt overlay
+### Low-level S3
 
 ```
-cat > rwm.conf <<__EOF__
-rwm_s3_endpoint_url: ""
-rwm_s3_access_key: ""
-rwm_s3_secret_key: ""
-rwm_rclone_crypt_bucket: "rwmcrypt"
-rwm_rclone_crypt_password: ""
-__EOF__
+cp examples/rwm-rclone.conf rwm.conf
+rwm aws s3 ls s3://
+rwm aws s3api list-buckets
+rwm rclone lsd rwmbe:/
+```
 
+
+### Simple copy: rclone with crypt overlay
+
+rclone_crypt defines single default remote named "rwmbe:/" pointed to `rwm_rclone_crypt_bucket` path.
+
+```
+cp examples/rwm-rclone.conf rwm.conf
 rwm rclone_crypt sync /data rwmbe:/
 rwm rclone_crypt lsl rwmbe:/
 ```
@@ -79,47 +83,25 @@ rwm rclone_crypt lsl rwmbe:/
 ### Restic: manual restic backup
 
 ```
-cat > rwm.conf <<__EOF__
-rwm_s3_endpoint_url: ""
-rwm_s3_access_key: ""
-rwm_s3_secret_key: ""
-rwm_restic_bucket: "rwmrestic"
-rwm_restic_password: ""
-__EOF__
-
+cp examples/rwm-restic.conf rwm.conf
 rwm restic init
 rwm restic backup /data
 rwm restic snapshots
+rwm restic mount /mnt/restore
 ```
+
+note: executed tools stdout is buffered, mount does not have immediate output as normal `restic mount` would
+
 
 ### RWM: simple backups
 
+backups follows standard restic procedures, but adds profile like configuration to easily run in schedulers
+
 ```
-cat > rwm.conf <<__EOF__
-rwm_s3_endpoint_url: ""
-rwm_s3_access_key: ""
-rwm_s3_secret_key: ""
-
-rwm_restic_bucket: "rwmrestic"
-rwm_restic_password: ""
-
-rwm_backups:
-  backup1:
-    filesdirs:
-      - /etc
-      - /data
-    excludes:
-      - *.cache
-    extras:
-      - --tag
-      - mytag1
-
-rwm_retention:
-  keep-daily: "14"
-  keep-weekly: "20"
-__EOF__
-
+cp examples/rwm-backups.conf rwm.conf
 rwm backup_all
+rwm restic snapshots
+rwm restic mount /mnt/restore
 ```
 
 

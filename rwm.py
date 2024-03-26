@@ -329,10 +329,11 @@ def main(argv=None):
 
     if args.command == "backup":
         ret = rwmi.backup_cmd(args.name).returncode
+        logger.info("rwm backup finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     if args.command == "backup_all":
         ret = rwmi.backup_all_cmd()
+        logger.info("rwm backup_all finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
 
-    logger.info("rwm finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     return ret
 
 
