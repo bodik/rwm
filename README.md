@@ -46,14 +46,86 @@ TBD:
 * number of object files vs size
 
 
-## Install
+## Usage
+
+Beside the WORM management features, `rwm` can also be used as simple wrapper to other S3 related
+tools such as `aws` CLI, `rclone` and `restic`.
+
+It can be also used as simple backup manager for intended usecases.
+
+
+### Install
 ```
 git clone git@gitlab.flab.cesnet.cz:bodik/rwm.git /opt/rwm
 cd /opt/rwm
 make install
 ```
 
-## Development
+### Simple copy: rclone with crypt overlay
+
+```
+cat > rwm.conf <<__EOF__
+rwm_s3_endpoint_url: ""
+rwm_s3_access_key: ""
+rwm_s3_secret_key: ""
+rwm_rclone_crypt_bucket: "rwmcrypt"
+rwm_rclone_crypt_password: ""
+__EOF__
+
+rwm rclone_crypt sync /data rwmbe:/
+rwm rclone_crypt lsl rwmbe:/
+```
+
+### Restic: manual restic backup
+
+```
+cat > rwm.conf <<__EOF__
+rwm_s3_endpoint_url: ""
+rwm_s3_access_key: ""
+rwm_s3_secret_key: ""
+rwm_restic_bucket: "rwmrestic"
+rwm_restic_password: ""
+__EOF__
+
+rwm restic init
+rwm restic backup /data
+rwm restic snapshots
+```
+
+### RWM: simple backups
+
+```
+cat > rwm.conf <<__EOF__
+rwm_s3_endpoint_url: ""
+rwm_s3_access_key: ""
+rwm_s3_secret_key: ""
+
+rwm_restic_bucket: "rwmrestic"
+rwm_restic_password: ""
+
+rwm_backups:
+  backup1:
+    filesdirs:
+      - /etc
+      - /data
+    excludes:
+      - *.cache
+    extras:
+      - --tag
+      - mytag1
+
+rwm_retention:
+  keep-daily: "14"
+  keep-weekly: "20"
+__EOF__
+
+rwm backup_all
+```
+
+
+## Notes
+
+#### Development
 ```
 git clone git@gitlab.flab.cesnet.cz:bodik/rwm.git /opt/rwm
 cd /opt/rwm
@@ -62,42 +134,11 @@ make venv
 . venv/bin/activate
 ```
 
-## simple copy: rclone with crypt overlay
-
-```
-cat > rwm.conf <<__EOF__
-RWM_S3_ENDPOINT_URL: ""
-RWM_S3_ACCESS_KEY: ""
-RWM_S3_SECRET_KEY: ""
-RWM_RCLONE_CRYPT_BUCKET: "rwmcrypt"
-RWM_RCLONE_CRYPT_PASSWORD: ""
-__EOF__
-rwm rclone_crypt sync /data rwmbe:/
-rwm rclone_crypt lsl rwmbe:/
-```
-
-
-## restic: restic backup
-
-```
-cat > rwm.conf <<__EOF__
-RWM_S3_ENDPOINT_URL: ""
-RWM_S3_ACCESS_KEY: ""
-RWM_S3_SECRET_KEY: ""
-RWM_RESTIC_BUCKET: "rwmrestic"
-RWM_RESTIC_PASSWORD: ""
-__EOF__
-rwm restic init
-rwm restic backup /data
-rwm restic snapshots
-```
-
-
-### Notes
 
 ### Passing arguments
 
 Passthrough full arguments to underlyin tool with "--" (eg. `rwm rclone -- ls --help`).
+
 
 ### rclone sync
 * https://rclone.org/commands/rclone_sync/
@@ -105,6 +146,7 @@ Passthrough full arguments to underlyin tool with "--" (eg. `rwm rclone -- ls --
 It is always the contents of the directory that is synced, not the directory itself.
 So when source:path is a directory, it's the contents of source:path that are copied,
 not the directory name and contents. See extended explanation in the copy command if unsure.
+
 
 ### rclone crypt
 

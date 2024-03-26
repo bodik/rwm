@@ -189,8 +189,8 @@ class RWM:
         excludes = []
         for item in conf.get("excludes", []):
             excludes += ["--exclude", item]
-        backup_extras = conf.get("backup_extras", [])
-        cmd_args = ["backup"] + backup_extras + excludes + conf["filesdirs"]
+        extras = conf.get("extras", [])
+        cmd_args = ["backup"] + extras + excludes + conf["filesdirs"]
 
         return self.restic_cmd(cmd_args)
 

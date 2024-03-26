@@ -12,5 +12,5 @@ rwm_restic_bucket: "rwmcrypt"
 rwm_restic_password: ""
 
 # backup
-rwm_backups: []
-rwm_retention: []
+rwm_backups: {}
+rwm_retention: {}
