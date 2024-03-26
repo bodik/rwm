@@ -2,17 +2,20 @@
 """rwm, restic/s3 worm manager"""
 
 import base64
+import dataclasses
 import logging
 import os
 import shlex
 import subprocess
 import sys
 from argparse import ArgumentParser
+from datetime import datetime
 from pathlib import Path
 
 import yaml
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+from tabulate import tabulate
 
 
 __version__ = "0.2"
@@ -72,6 +75,28 @@ def rclone_obscure_password(plaintext, iv=None):
     encryptor = Cipher(algorithms.AES(secret_key), modes.CTR(iv), backend=default_backend()).encryptor()
     data = iv + encryptor.update(plaintext.encode()) + encryptor.finalize()
     return base64.urlsafe_b64encode(data).decode().rstrip("=")
+
+
+@dataclasses.dataclass
+class BackupResult:
+    """backup results data container"""
+
+    name: str
+    returncode: int
+    time_start: datetime
+    time_end: datetime
+
+    def to_dict(self):
+        """dict serializer"""
+
+        return {
+            "ident": "RESULT",
+            "name": self.name,
+            "status": "OK" if self.returncode == 0 else "ERROR",
+            "returncode": self.returncode,
+            "backup_start": self.time_start.isoformat(),
+            "backup_time": str(self.time_end-self.time_start),
+        }
 
 
 class RWM:
@@ -148,45 +173,91 @@ class RWM:
         }
         return run_command(["restic"] + args, env=env)
 
-    def backup(self, name):
-        """do restic backup from config"""
+    def restic_autoinit(self):
+        """runs restic init"""
 
-        if self.restic_cmd(["cat", "config"]).returncode != 0:
-            if (proc := self.restic_cmd(["init"])).returncode != 0:
-                logger.error("failed to autoinitialize restic repository")
-                return proc
+        logger.info("run restic_autoinit")
+        if (proc := self.restic_cmd(["cat", "config"])).returncode != 0:
+            proc = self.restic_cmd(["init"])
+        return proc
 
+    def restic_backup(self, name):
+        """runs restic backup by name"""
+
+        logger.info(f"run restic_backup {name}")
         conf = self.config["RWM_BACKUPS"][name]
+        excludes = []
+        for item in conf.get("excludes", []):
+            excludes += ["--exclude", item]
+        backup_extras = conf.get("backup_extras", [])
+        cmd_args = ["backup"] + backup_extras + excludes + conf["filesdirs"]
 
-        # restic backup
-        excludes = conf.get("excludes", [])
-        excludes = [x for pair in zip(["--exclude"] * len(excludes), excludes) for x in pair]
-        extras = conf.get("extras", [])
-        cmd_args = ["backup"] + extras + excludes + conf["filesdirs"]
+        return self.restic_cmd(cmd_args)
 
-        logger.info("running backup")
-        backup_proc = self.restic_cmd(cmd_args)
-        wrap_output(backup_proc)
-        if backup_proc.returncode != 0:
-            logger.error("backup failed, %s", backup_proc)
-            return backup_proc
+    def restic_forget_prune(self):
+        """runs forget prune"""
 
-        # restic forget prune
+        logger.info("run restic_forget_prune")
         keeps = []
         for key, val in self.config.get("RWM_RETENTION", {}).items():
             keeps += [f"--{key}", val]
-        if not keeps:
-            logger.error("no retention policy found")
         cmd_args = ["forget", "--prune"] + keeps
 
-        logger.info("running forget prune")
-        forget_proc = self.restic_cmd(cmd_args)
-        wrap_output(forget_proc)
+        return self.restic_cmd(cmd_args)
+
+    def backup_cmd(self, name):
+        """backup command"""
+
+        autoinit_proc = self.restic_autoinit()
+        if autoinit_proc.returncode != 0:
+            logger.error("restic autoinit failed")
+            wrap_output(autoinit_proc)
+            return autoinit_proc
+
+        wrap_output(backup_proc := self.restic_backup(name))
+        if backup_proc.returncode != 0:
+            logger.error("restic_backup failed")
+            return backup_proc
+
+        wrap_output(forget_proc := self.restic_forget_prune())
         if forget_proc.returncode != 0:
-            logger.error("forget prune failed, %s", forget_proc)
+            logger.error("restic_forget_prune failed")
             return forget_proc
 
         return backup_proc
+
+    def backup_all_cmd(self):
+        """backup all command"""
+
+        stats = {}
+        ret = 0
+
+        time_start = datetime.now()
+        autoinit_proc = self.restic_autoinit()
+        time_end = datetime.now()
+        if autoinit_proc.returncode != 0:
+            logger.error("restic autoinit failed")
+            wrap_output(autoinit_proc)
+            return autoinit_proc.returncode
+        stats["_autoinit"] = BackupResult("_autoinit", autoinit_proc.returncode, time_start, time_end)
+
+        for name in self.config["RWM_BACKUPS"].keys():
+            time_start = datetime.now()
+            wrap_output(backup_proc := self.restic_backup(name))
+            time_end = datetime.now()
+            ret |= backup_proc.returncode
+            stats[name] = BackupResult(name, backup_proc.returncode, time_start, time_end)
+
+        if ret == 0:
+            time_start = datetime.now()
+            wrap_output(forget_proc := self.restic_forget_prune())
+            time_end = datetime.now()
+            ret |= forget_proc.returncode
+            stats["_forget_prune"] = BackupResult("_forget_prune", forget_proc.returncode, time_start, time_end)
+
+        logger.info("rwm backup_all results")
+        print(tabulate([item.to_dict() for item in stats.values()], headers="keys", numalign="left"))
+        return ret
 
 
 def configure_logging(debug):
@@ -212,6 +283,7 @@ def parse_arguments(argv):
 
     subparsers = parser.add_subparsers(title="commands", dest="command", required=False)
     subparsers.add_parser("version", help="show version")
+
     aws_cmd_parser = subparsers.add_parser("aws", help="aws command")
     aws_cmd_parser.add_argument("cmd_args", nargs="*")
     rc_cmd_parser = subparsers.add_parser("rclone", help="rclone command")
@@ -220,8 +292,10 @@ def parse_arguments(argv):
     rcc_cmd_parser.add_argument("cmd_args", nargs="*")
     res_cmd_parser = subparsers.add_parser("restic", help="restic command")
     res_cmd_parser.add_argument("cmd_args", nargs="*")
+
     backup_cmd_parser = subparsers.add_parser("backup", help="backup command")
     backup_cmd_parser.add_argument("name", help="backup config name")
+    subparsers.add_parser("backup_all", help="backup all command")
 
     return parser.parse_args(argv)
 
@@ -252,8 +326,11 @@ def main(argv=None):
         ret = wrap_output(rwmi.rclone_crypt_cmd(args.cmd_args))
     if args.command == "restic":
         ret = wrap_output(rwmi.restic_cmd(args.cmd_args))
+
     if args.command == "backup":
-        ret = rwmi.backup(args.name).returncode
+        ret = rwmi.backup_cmd(args.name).returncode
+    if args.command == "backup_all":
+        ret = rwmi.backup_all_cmd()
 
     logger.info("rwm finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     return ret

@@ -46,12 +46,13 @@ def test_main(tmpworkdir: str):  # pylint: disable=unused-argument
 
     # command branches
     mock = Mock(return_value=CompletedProcess(args='dummy', returncode=0))
-    for item in ["aws", "rclone", "rclone_crypt", "restic"]:
+    for item in ["aws", "rclone", "rclone_crypt", "restic", "backup"]:
         with patch.object(rwm.RWM, f"{item}_cmd", mock):
             assert rwm_main([item, "dummy"]) == 0
 
-    with patch.object(rwm.RWM, "backup", mock):
-        assert rwm_main(["backup", "dummy"]) == 0
+    mock = Mock(return_value=0)
+    with patch.object(rwm.RWM, "backup_all_cmd", mock):
+        assert rwm_main(["backup_all"]) == 0
 
 
 def test_aws_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
@@ -162,8 +163,8 @@ def _list_files(trwm, snapshot_id):
     ]
 
 
-def test_backup(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
-    """test backup command"""
+def test_backup_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
+    """test backup_cmd command"""
 
     trwm = RWM({
         "RWM_S3_ENDPOINT_URL": motoserver,
@@ -187,7 +188,7 @@ def test_backup(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-arg
     Path("testdatadir/testdata1.txt").write_text("dummydata", encoding="utf-8")
     Path("testdatadir/testfile_to_be_ignored").write_text("dummydata", encoding="utf-8")
 
-    assert trwm.backup("testcfg").returncode == 0
+    assert trwm.backup_cmd("testcfg").returncode == 0
 
     snapshots = _list_snapshots(trwm)
     assert len(snapshots) == 1
@@ -195,15 +196,7 @@ def test_backup(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-arg
     assert "/testdatadir/testdata1.txt" in snapshot_files
 
 
-def test_backup_autoinit():  # pylint: disable=unused-argument
-    """mocked error handling test"""
-
-    mock = Mock(return_value=CompletedProcess(args='dummy', returncode=1))
-    with patch.object(rwm.RWM, "restic_cmd", mock):
-        RWM({}).backup("dummy")
-
-
-def test_backup_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
+def test_backup_cmd_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
     """test backup command"""
 
     trwm = RWM({
@@ -229,7 +222,7 @@ def test_backup_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=u
     Path("testdatadir/proc").mkdir()
     Path("testdatadir/proc/to_be_also_excluded").write_text("dummydata", encoding="utf-8")
 
-    assert trwm.backup("testcfg").returncode == 0
+    assert trwm.backup_cmd("testcfg").returncode == 0
 
     snapshots = _list_snapshots(trwm)
     assert len(snapshots) == 1
@@ -238,32 +231,61 @@ def test_backup_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=u
     assert "/testdatadir/etc/config2" in snapshot_files
 
 
-def test_backup_error_handling(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
+def test_backup_cmd_error_handling(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
     """test backup command err cases"""
 
-    mock = Mock(side_effect=[
-        CompletedProcess(args='dummy', returncode=0),  # autoinit
-        CompletedProcess(args='dummy', returncode=11)  # backup
-    ])
-    with patch.object(rwm.RWM, "restic_cmd", mock):
-        trwm = RWM({
-            "RWM_BACKUPS": {
-                "dummycfg": {"filesdirs": ["dummydir"]}
-            }
-        })
-        proc = trwm.backup("dummycfg")
-        assert proc.returncode == 11
+    rwm_conf = {
+        "RWM_BACKUPS": {
+            "dummycfg": {"filesdirs": ["dummydir"]}
+        }
+    }
+    mock_ok = Mock(return_value=CompletedProcess(args='dummy', returncode=0))
+    mock_fail = Mock(return_value=CompletedProcess(args='dummy', returncode=11))
 
-    mock = Mock(side_effect=[
-        CompletedProcess(args='dummy', returncode=0),  # autoinit
-        CompletedProcess(args='dummy', returncode=0),  # backup
-        CompletedProcess(args='dummy', returncode=12)  # forget
-    ])
-    with patch.object(rwm.RWM, "restic_cmd", mock):
-        trwm = RWM({
-            "RWM_BACKUPS": {
-                "dummycfg": {"filesdirs": ["dummydir"]}
-            }
-        })
-        proc = trwm.backup("dummycfg")
-        assert proc.returncode == 12
+    with patch.object(rwm.RWM, "restic_autoinit", mock_fail):
+        assert RWM(rwm_conf).backup_cmd("dummycfg").returncode == 11
+
+    with (
+        patch.object(rwm.RWM, "restic_autoinit", mock_ok),
+        patch.object(rwm.RWM, "restic_backup", mock_fail)
+    ):
+        assert RWM(rwm_conf).backup_cmd("dummycfg").returncode == 11
+
+    with (
+        patch.object(rwm.RWM, "restic_autoinit", mock_ok),
+        patch.object(rwm.RWM, "restic_backup", mock_ok),
+        patch.object(rwm.RWM, "restic_forget_prune", mock_fail)
+    ):
+        assert RWM(rwm_conf).backup_cmd("dummycfg").returncode == 11
+
+
+def test_backup_all_cmd(tmpworkdir: str):  # pylint: disable=unused-argument
+    """test backup command err cases"""
+
+    rwm_conf = {
+        "RWM_BACKUPS": {
+            "dummycfg": {"filesdirs": ["dummydir"]}
+        }
+    }
+    mock = Mock(return_value=CompletedProcess(args='dummy', returncode=0))
+
+    with (
+        patch.object(rwm.RWM, "restic_autoinit", mock),
+        patch.object(rwm.RWM, "restic_backup", mock),
+        patch.object(rwm.RWM, "restic_forget_prune", mock)
+    ):
+        assert RWM(rwm_conf).backup_all_cmd() == 0
+
+
+def test_backup_all_cmd_error_handling(tmpworkdir: str):  # pylint: disable=unused-argument
+    """test backup command err cases"""
+
+    rwm_conf = {
+        "RWM_BACKUPS": {
+            "dummycfg": {"filesdirs": ["dummydir"]}
+        }
+    }
+    mock_fail = Mock(return_value=CompletedProcess(args='dummy', returncode=11))
+
+    with patch.object(rwm.RWM, "restic_autoinit", mock_fail):
+        assert RWM(rwm_conf).backup_all_cmd() == 11
