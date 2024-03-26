@@ -208,7 +208,7 @@ def test_backup_cmd_excludes(tmpworkdir: str, motoserver: str):  # pylint: disab
         "rwm_backups": {
             "testcfg": {
                 "filesdirs": ["testdatadir"],
-                "excludes": ["proc", "*.ignored"],
+                "excludes": ["proc/*", "*.ignored"],
                 "extras": ["--tag", "dummytag"],
             }
         }
@@ -219,8 +219,15 @@ def test_backup_cmd_excludes(tmpworkdir: str, motoserver: str):  # pylint: disab
     Path("testdatadir/etc/config").write_text("dummydata", encoding="utf-8")
     Path("testdatadir/etc/config2").write_text("dummydata", encoding="utf-8")
     Path("testdatadir/etc/config3.ignored").write_text("dummydata", encoding="utf-8")
+    Path("testdatadir/etc/proc").write_text("dummydata", encoding="utf-8")
+    Path("testdatadir/etc/processor").write_text("dummydata", encoding="utf-8")
     Path("testdatadir/proc").mkdir()
     Path("testdatadir/proc/to_be_also_excluded").write_text("dummydata", encoding="utf-8")
+    Path("testdatadir/processor").write_text("dummydata", encoding="utf-8")
+    Path("testdatadir/some_other_proc_essor").write_text("dummydata", encoding="utf-8")
+    Path("testdatadir/var").mkdir()
+    Path("testdatadir/var/proc").mkdir()
+    Path("testdatadir/var/proc/data").write_text("dummydata", encoding="utf-8")
 
     assert trwm.backup_cmd("testcfg").returncode == 0
 
@@ -229,6 +236,15 @@ def test_backup_cmd_excludes(tmpworkdir: str, motoserver: str):  # pylint: disab
     snapshot_files = _list_files(trwm, snapshots[0]["id"])
     assert "/testdatadir/etc/config" in snapshot_files
     assert "/testdatadir/etc/config2" in snapshot_files
+    assert "/testdatadir/etc/config3.ignored" not in snapshot_files
+    assert "/testdatadir/etc/proc" in snapshot_files
+    assert "/testdatadir/etc/processor" in snapshot_files
+    assert "/testdatadir/proc" not in snapshot_files
+    assert "/testdatadir/proc/to_be_also_excluded" not in snapshot_files
+    assert "/testdatadir/processor" in snapshot_files
+    assert "/testdatadir/some_other_proc_essor" in snapshot_files
+    # following expected result does not work , because test config uses root-unanchored exclude path "proc/*"
+    # assert "/testdatadir/var/proc/data" in snapshot_files
 
 
 def test_backup_cmd_error_handling(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
