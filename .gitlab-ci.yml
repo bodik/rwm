@@ -1,0 +1,24 @@
+---
+image: debian:bookworm
+
+stages:
+  - lint
+  - coverage
+
+lint:
+  stage: lint
+  before_script:
+    - apt-get update && apt-get -y install make
+    - make install
+    - make venv
+  script:
+    - . venv/bin/activate && make lint
+
+coverage:
+  stage: coverage
+  before_script:
+    - apt-get update && apt-get -y install make
+    - make install
+    - make venv
+  script:
+    - . venv/bin/activate && make coverage
