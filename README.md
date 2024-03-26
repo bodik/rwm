@@ -28,8 +28,8 @@ credentials for the managed bucket.
 
 RWM can:
 
-* provide low-level S3 access for aws cli, rclone
-* rclone crypt over S3 backend
+* low-level S3 access for aws cli and rclone
+* rclone "crypt over S3" backend
 * restic with S3 repository
 * configurable backup manager/executor
 
