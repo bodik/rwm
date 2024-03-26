@@ -111,15 +111,15 @@ class RWM:
         env = {
             "PATH": os.environ["PATH"],
             "AWS_METADATA_SERVICE_NUM_ATTEMPTS": "0",
-            "AWS_ACCESS_KEY_ID": self.config["RWM_S3_ACCESS_KEY"],
-            "AWS_SECRET_ACCESS_KEY": self.config["RWM_S3_SECRET_KEY"]
+            "AWS_ACCESS_KEY_ID": self.config["rwm_s3_access_key"],
+            "AWS_SECRET_ACCESS_KEY": self.config["rwm_s3_secret_key"]
         }
         if is_sublist(["s3", "mb"], args):
             # region must be set and empty for awscil >=2.x and ?du? ceph s3
             env.update({"AWS_DEFAULT_REGION": ""})
 
         # aws cli does not have endpoint-url as env config option
-        return run_command(["aws", "--endpoint-url", self.config["RWM_S3_ENDPOINT_URL"]] + args, env=env)
+        return run_command(["aws", "--endpoint-url", self.config["rwm_s3_endpoint_url"]] + args, env=env)
 
     def rclone_cmd(self, args):
         """rclone wrapper"""
@@ -127,9 +127,9 @@ class RWM:
         env = {
             "RCLONE_CONFIG": "",
             "RCLONE_CONFIG_RWMBE_TYPE": "s3",
-            "RCLONE_CONFIG_RWMBE_ENDPOINT": self.config["RWM_S3_ENDPOINT_URL"],
-            "RCLONE_CONFIG_RWMBE_ACCESS_KEY_ID": self.config["RWM_S3_ACCESS_KEY"],
-            "RCLONE_CONFIG_RWMBE_SECRET_ACCESS_KEY": self.config["RWM_S3_SECRET_KEY"],
+            "RCLONE_CONFIG_RWMBE_ENDPOINT": self.config["rwm_s3_endpoint_url"],
+            "RCLONE_CONFIG_RWMBE_ACCESS_KEY_ID": self.config["rwm_s3_access_key"],
+            "RCLONE_CONFIG_RWMBE_SECRET_ACCESS_KEY": self.config["rwm_s3_secret_key"],
             "RCLONE_CONFIG_RWMBE_PROVIDER": "Ceph",
             "RCLONE_CONFIG_RWMBE_ENV_AUTH": "false",
             "RCLONE_CONFIG_RWMBE_REGION": "",
@@ -146,14 +146,14 @@ class RWM:
         env = {
             "RCLONE_CONFIG": "",
             "RCLONE_CONFIG_RWMBE_TYPE": "crypt",
-            "RCLONE_CONFIG_RWMBE_REMOTE": f"rwmbes3:/{self.config['RWM_RCLONE_CRYPT_BUCKET']}",
-            "RCLONE_CONFIG_RWMBE_PASSWORD": rclone_obscure_password(self.config["RWM_RCLONE_CRYPT_PASSWORD"]),
-            "RCLONE_CONFIG_RWMBE_PASSWORD2": rclone_obscure_password(self.config["RWM_RCLONE_CRYPT_PASSWORD"]),
+            "RCLONE_CONFIG_RWMBE_REMOTE": f"rwmbes3:/{self.config['rwm_rclone_crypt_bucket']}",
+            "RCLONE_CONFIG_RWMBE_PASSWORD": rclone_obscure_password(self.config["rwm_rclone_crypt_password"]),
+            "RCLONE_CONFIG_RWMBE_PASSWORD2": rclone_obscure_password(self.config["rwm_rclone_crypt_password"]),
 
             "RCLONE_CONFIG_RWMBES3_TYPE": "s3",
-            "RCLONE_CONFIG_RWMBES3_ENDPOINT": self.config["RWM_S3_ENDPOINT_URL"],
-            "RCLONE_CONFIG_RWMBES3_ACCESS_KEY_ID": self.config["RWM_S3_ACCESS_KEY"],
-            "RCLONE_CONFIG_RWMBES3_SECRET_ACCESS_KEY": self.config["RWM_S3_SECRET_KEY"],
+            "RCLONE_CONFIG_RWMBES3_ENDPOINT": self.config["rwm_s3_endpoint_url"],
+            "RCLONE_CONFIG_RWMBES3_ACCESS_KEY_ID": self.config["rwm_s3_access_key"],
+            "RCLONE_CONFIG_RWMBES3_SECRET_ACCESS_KEY": self.config["rwm_s3_secret_key"],
             "RCLONE_CONFIG_RWMBES3_PROVIDER": "Ceph",
             "RCLONE_CONFIG_RWMBES3_ENV_AUTH": "false",
             "RCLONE_CONFIG_RWMBES3_REGION": "",
@@ -166,10 +166,10 @@ class RWM:
         env = {
             "HOME": os.environ["HOME"],
             "PATH": os.environ["PATH"],
-            "AWS_ACCESS_KEY_ID": self.config["RWM_S3_ACCESS_KEY"],
-            "AWS_SECRET_ACCESS_KEY": self.config["RWM_S3_SECRET_KEY"],
-            "RESTIC_PASSWORD": self.config["RWM_RESTIC_PASSWORD"],
-            "RESTIC_REPOSITORY": f"s3:{self.config['RWM_S3_ENDPOINT_URL']}/{self.config['RWM_RESTIC_BUCKET']}",
+            "AWS_ACCESS_KEY_ID": self.config["rwm_s3_access_key"],
+            "AWS_SECRET_ACCESS_KEY": self.config["rwm_s3_secret_key"],
+            "RESTIC_PASSWORD": self.config["rwm_restic_password"],
+            "RESTIC_REPOSITORY": f"s3:{self.config['rwm_s3_endpoint_url']}/{self.config['rwm_restic_bucket']}",
         }
         return run_command(["restic"] + args, env=env)
 
@@ -185,7 +185,7 @@ class RWM:
         """runs restic backup by name"""
 
         logger.info(f"run restic_backup {name}")
-        conf = self.config["RWM_BACKUPS"][name]
+        conf = self.config["rwm_backups"][name]
         excludes = []
         for item in conf.get("excludes", []):
             excludes += ["--exclude", item]
@@ -199,7 +199,7 @@ class RWM:
 
         logger.info("run restic_forget_prune")
         keeps = []
-        for key, val in self.config.get("RWM_RETENTION", {}).items():
+        for key, val in self.config.get("rwm_retention", {}).items():
             keeps += [f"--{key}", val]
         cmd_args = ["forget", "--prune"] + keeps
 
@@ -241,7 +241,7 @@ class RWM:
             return autoinit_proc.returncode
         stats["_autoinit"] = BackupResult("_autoinit", autoinit_proc.returncode, time_start, time_end)
 
-        for name in self.config["RWM_BACKUPS"].keys():
+        for name in self.config["rwm_backups"].keys():
             time_start = datetime.now()
             wrap_output(backup_proc := self.restic_backup(name))
             time_end = datetime.now()

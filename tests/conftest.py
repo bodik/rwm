@@ -37,7 +37,7 @@ def tmpworkdir():
     """
 
     cwd = os.getcwd()
-    tmpdir = mkdtemp(prefix='rwm_test-')
+    tmpdir = mkdtemp(prefix='rwmtest_')
     os.chdir(tmpdir)
     yield tmpdir
     os.chdir(cwd)

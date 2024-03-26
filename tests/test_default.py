@@ -59,9 +59,9 @@ def test_aws_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-ar
     """test aws command"""
 
     trwm = RWM({
-        "RWM_S3_ENDPOINT_URL": motoserver,
-        "RWM_S3_ACCESS_KEY": "dummy",
-        "RWM_S3_SECRET_KEY": "dummy",
+        "rwm_s3_endpoint_url": motoserver,
+        "rwm_s3_access_key": "dummy",
+        "rwm_s3_secret_key": "dummy",
     })
     s3 = boto3.client('s3', endpoint_url=motoserver, aws_access_key_id="dummy", aws_secret_access_key="dummy")
     test_bucket = "testbucket"
@@ -79,9 +79,9 @@ def test_rclone_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused
     """test rclone command"""
 
     trwm = RWM({
-        "RWM_S3_ENDPOINT_URL": motoserver,
-        "RWM_S3_ACCESS_KEY": "dummy",
-        "RWM_S3_SECRET_KEY": "dummy",
+        "rwm_s3_endpoint_url": motoserver,
+        "rwm_s3_access_key": "dummy",
+        "rwm_s3_secret_key": "dummy",
     })
     s3 = boto3.client('s3', endpoint_url=motoserver, aws_access_key_id="dummy", aws_secret_access_key="dummy")
 
@@ -99,11 +99,11 @@ def test_rclone_crypt_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=
     """test rclone with crypt overlay"""
 
     trwm = RWM({
-        "RWM_S3_ENDPOINT_URL": motoserver,
-        "RWM_S3_ACCESS_KEY": "dummy",
-        "RWM_S3_SECRET_KEY": "dummy",
-        "RWM_RCLONE_CRYPT_BUCKET": "cryptdata_test",
-        "RWM_RCLONE_CRYPT_PASSWORD": rclone_obscure_password("dummydummydummydummydummydummydummydummy"),
+        "rwm_s3_endpoint_url": motoserver,
+        "rwm_s3_access_key": "dummy",
+        "rwm_s3_secret_key": "dummy",
+        "rwm_rclone_crypt_bucket": "cryptdata_test",
+        "rwm_rclone_crypt_password": rclone_obscure_password("dummydummydummydummy"),
     })
     s3 = boto3.client('s3', endpoint_url=motoserver, aws_access_key_id="dummy", aws_secret_access_key="dummy")
 
@@ -112,30 +112,30 @@ def test_rclone_crypt_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=
     Path(test_file).write_text('1234', encoding='utf-8')
 
     trwm.rclone_crypt_cmd(["copy", test_file, f"rwmbe:/{test_bucket}/"])
-    assert len(objects_plain_list(s3.list_objects_v2(Bucket=trwm.config["RWM_RCLONE_CRYPT_BUCKET"]))) == 1
+    assert len(objects_plain_list(s3.list_objects_v2(Bucket=trwm.config["rwm_rclone_crypt_bucket"]))) == 1
 
     trwm.rclone_crypt_cmd(["delete", f"rwmbe:/{test_bucket}/{test_file}"])
-    assert s3.list_objects_v2(Bucket=trwm.config["RWM_RCLONE_CRYPT_BUCKET"])["KeyCount"] == 0
+    assert s3.list_objects_v2(Bucket=trwm.config["rwm_rclone_crypt_bucket"])["KeyCount"] == 0
 
     test_file1 = "testfile1.txt"
     Path(test_file1).write_text('4321', encoding='utf-8')
     trwm.rclone_crypt_cmd(["sync", ".", f"rwmbe:/{test_bucket}/"])
-    assert s3.list_objects_v2(Bucket=trwm.config["RWM_RCLONE_CRYPT_BUCKET"])["KeyCount"] == 2
+    assert s3.list_objects_v2(Bucket=trwm.config["rwm_rclone_crypt_bucket"])["KeyCount"] == 2
 
     Path(test_file1).unlink()
     trwm.rclone_crypt_cmd(["sync", ".", f"rwmbe:/{test_bucket}/"])
-    assert s3.list_objects_v2(Bucket=trwm.config["RWM_RCLONE_CRYPT_BUCKET"])["KeyCount"] == 1
+    assert s3.list_objects_v2(Bucket=trwm.config["rwm_rclone_crypt_bucket"])["KeyCount"] == 1
 
 
 def test_restic_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
     """test restic command"""
 
     trwm = RWM({
-        "RWM_S3_ENDPOINT_URL": motoserver,
-        "RWM_S3_ACCESS_KEY": "dummy",
-        "RWM_S3_SECRET_KEY": "dummy",
-        "RWM_RESTIC_BUCKET": "restictest",
-        "RWM_RESTIC_PASSWORD": "dummydummydummydummydummydummydummydummy",
+        "rwm_s3_endpoint_url": motoserver,
+        "rwm_s3_access_key": "dummy",
+        "rwm_s3_secret_key": "dummy",
+        "rwm_restic_bucket": "restictest",
+        "rwm_restic_password": "dummydummydummydummy",
     })
 
     assert trwm.restic_cmd(["init"]).returncode == 0
@@ -167,19 +167,19 @@ def test_backup_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused
     """test backup_cmd command"""
 
     trwm = RWM({
-        "RWM_S3_ENDPOINT_URL": motoserver,
-        "RWM_S3_ACCESS_KEY": "dummy",
-        "RWM_S3_SECRET_KEY": "dummy",
-        "RWM_RESTIC_BUCKET": "restictest",
-        "RWM_RESTIC_PASSWORD": "dummydummydummydummydummydummydummydummy",
-        "RWM_BACKUPS": {
+        "rwm_s3_endpoint_url": motoserver,
+        "rwm_s3_access_key": "dummy",
+        "rwm_s3_secret_key": "dummy",
+        "rwm_restic_bucket": "restictest",
+        "rwm_restic_password": "dummydummydummydummy",
+        "rwm_backups": {
             "testcfg": {
                 "filesdirs": ["testdatadir/"],
                 "excludes": ["testfile_to_be_ignored"],
                 "extras": ["--tag", "dummytag"],
             }
         },
-        "RWM_RETENTION": {
+        "rwm_retention": {
             "keep-daily": "1"
         }
     })
@@ -200,12 +200,12 @@ def test_backup_cmd_excludes(tmpworkdir: str, motoserver: str):  # pylint: disab
     """test backup command"""
 
     trwm = RWM({
-        "RWM_S3_ENDPOINT_URL": motoserver,
-        "RWM_S3_ACCESS_KEY": "dummy",
-        "RWM_S3_SECRET_KEY": "dummy",
-        "RWM_RESTIC_BUCKET": "restictest",
-        "RWM_RESTIC_PASSWORD": "dummydummydummydummydummydummydummydummy",
-        "RWM_BACKUPS": {
+        "rwm_s3_endpoint_url": motoserver,
+        "rwm_s3_access_key": "dummy",
+        "rwm_s3_secret_key": "dummy",
+        "rwm_restic_bucket": "restictest",
+        "rwm_restic_password": "dummydummydummydummy",
+        "rwm_backups": {
             "testcfg": {
                 "filesdirs": ["testdatadir"],
                 "excludes": ["proc", "*.ignored"],
@@ -235,7 +235,7 @@ def test_backup_cmd_error_handling(tmpworkdir: str, motoserver: str):  # pylint:
     """test backup command err cases"""
 
     rwm_conf = {
-        "RWM_BACKUPS": {
+        "rwm_backups": {
             "dummycfg": {"filesdirs": ["dummydir"]}
         }
     }
@@ -263,7 +263,7 @@ def test_backup_all_cmd(tmpworkdir: str):  # pylint: disable=unused-argument
     """test backup command err cases"""
 
     rwm_conf = {
-        "RWM_BACKUPS": {
+        "rwm_backups": {
             "dummycfg": {"filesdirs": ["dummydir"]}
         }
     }
@@ -281,7 +281,7 @@ def test_backup_all_cmd_error_handling(tmpworkdir: str):  # pylint: disable=unus
     """test backup command err cases"""
 
     rwm_conf = {
-        "RWM_BACKUPS": {
+        "rwm_backups": {
             "dummycfg": {"filesdirs": ["dummydir"]}
         }
     }
