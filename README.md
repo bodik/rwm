@@ -60,6 +60,7 @@ cd /opt/rwm
 make install
 ```
 
+
 ### Low-level S3
 
 ```
@@ -80,6 +81,7 @@ rwm rclone_crypt sync /data rwmbe:/
 rwm rclone_crypt lsl rwmbe:/
 ```
 
+
 ### Restic: manual restic backup
 
 ```
@@ -89,8 +91,6 @@ rwm restic backup /data
 rwm restic snapshots
 rwm restic mount /mnt/restore
 ```
-
-note: executed tools stdout is buffered, mount does not have immediate output as normal `restic mount` would
 
 
 ### RWM: simple backups
@@ -107,7 +107,11 @@ rwm restic mount /mnt/restore
 
 ## Notes
 
-#### Development
+* executed tools stdout is buffered, eg. `restic mount` does not print immediate output as normal
+* passthrough full arguments to underlying tool with "--" (eg. `rwm rclone -- ls --help`).
+
+
+## Development
 ```
 git clone git@gitlab.flab.cesnet.cz:bodik/rwm.git /opt/rwm
 cd /opt/rwm
@@ -117,28 +121,6 @@ make venv
 ```
 
 
-### Passing arguments
+## Mainline backups
 
-Passthrough full arguments to underlyin tool with "--" (eg. `rwm rclone -- ls --help`).
-
-
-### rclone sync
-* https://rclone.org/commands/rclone_sync/
-
-It is always the contents of the directory that is synced, not the directory itself.
-So when source:path is a directory, it's the contents of source:path that are copied,
-not the directory name and contents. See extended explanation in the copy command if unsure.
-
-
-### rclone crypt
-
-* corect, fails to download corrupted files
-```
-2024/03/23 16:54:31 ERROR : testfile.txt: Failed to copy: failed to open source object: not an encrypted file - bad magic string
-2024/03/23 16:54:31 ERROR : Attempt 1/3 failed with 1 errors and: failed to open source object: not an encrypted file - bad magic string
-```
-
-* corect, skips bad filenames
-```
-2024/03/23 16:53:56 DEBUG : 6p78fe3tlp5o7ngi241jsjl2qX: Skipping undecryptable file name: illegal base32 data at input byte 25
-```
+TBD
