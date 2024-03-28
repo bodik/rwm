@@ -113,14 +113,22 @@ rwm restic mount /mnt/restore
 
 ## Development
 ```
-git clone git@gitlab.flab.cesnet.cz:bodik/rwm.git /opt/rwm
+git clone git@gitlab.cesnet.cz:radoslav_bodo/rwm.git /opt/rwm
 cd /opt/rwm
 make install
-make venv
+make install-dev
+make microceph-service
 . venv/bin/activate
+make coverage lint
 ```
 
 
-## Mainline backups
+## Gitlab Runner
 
-TBD
+```
+git clone git@gitlab.cesnet.cz:radoslav_bodo/rwm.git /opt/rwm
+cd /opt/rwm
+export RUNNER_URL=
+export RUNNER_TOKEN=
+make runner
+```

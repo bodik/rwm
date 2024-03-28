@@ -1,0 +1,63 @@
+---
+- name: install rwm runner
+  hosts: localhost
+  vars:
+    runner_url: "{{ lookup('ansible.builtin.env', 'RUNNER_URL') }}"
+    runner_token: "{{ lookup('ansible.builtin.env', 'RUNNER_TOKEN') }}"
+    runner_config: |
+      concurrent = 1
+      check_interval = 0
+      shutdown_timeout = 0
+      [session_server]
+      session_timeout = 1800
+      [[runners]]
+      name = "rwmsnaprunner"
+      url = "{{ runner_url }}"
+      token = "{{ runner_token }}"
+      executor = "shell"
+
+  handlers:
+    - name: gitlab-runner restart
+      service:
+        name: gitlab-runner
+        state: restarted
+
+  tasks:
+    - name: gitlab-runner dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - software-properties-common
+          - wget
+        state: present
+
+    - name: gitlab-runner apt key
+      apt_key:
+        id: F6403F6544A38863DAA0B6E03F01618A51312F3F
+        url: https://packages.gitlab.com/runner/gitlab-runner/gpgkey
+        state: present
+
+    - name: gitlab-runner apt repo
+      apt_repository:
+        repo: "deb https://packages.gitlab.com/runner/gitlab-runner/debian bookworm main"  # yamllint disable-line rule:line-length
+        state: present
+
+    - name: gitlab-runner package
+      apt:
+        name:
+          - gitlab-runner
+
+    - name: gitlab-runner config
+      copy:
+        content: "{{ runner_config }}"
+        dest: /etc/gitlab-runner/config.toml
+        owner: root
+        group: root
+        mode: 0600
+      notify: gitlab-runner restart
+
+    - name: development env with microceph
+      shell:
+        cmd: make install install-dev microceph-service
+        chdir: /opt/rwm
+        creates: /snap/bin/microceph

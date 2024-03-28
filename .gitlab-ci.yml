@@ -4,12 +4,15 @@ image: debian:bookworm
 stages:
   - code_quality
 
+variables:
+  GIT_STRATEGY: clone
+
 code_quality:
   stage: code_quality
   before_script:
-    - apt-get update && apt-get -y install make
-    - make install
-    - make venv
+    - python3 -m venv venv
+    - venv/bin/pip install -U pip
+    - venv/bin/pip install -r requirements.lock
   script:
     - . venv/bin/activate && make coverage
     - . venv/bin/activate && make lint

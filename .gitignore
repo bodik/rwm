@@ -3,5 +3,6 @@ __pycache__/
 .pytest_cache/
 .vscode/
 rwm.conf
+rwm-*.conf
 testfile*
 venv/

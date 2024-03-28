@@ -1,20 +1,13 @@
-all: lint
+all: coverage lint
 
 install:
-	apt-get -y install awscli make python3-cryptography python3-tabulate rclone restic yamllint
+	apt-get -y install awscli python3-cryptography python3-tabulate rclone restic yamllint
 
-venv:
-	apt-get -y install python3-venv
+install-dev:
+	apt-get -y install python3-venv snapd
 	python3 -m venv venv
 	venv/bin/pip install -U pip
 	venv/bin/pip install -r requirements.lock
-
-venv-refresh:
-	apt-get -y install python3-venv
-	rm -r venv
-	python3 -m venv venv
-	venv/bin/pip install -U pip
-	venv/bin/pip install -r requirements.txt
 
 freeze:
 	@pip freeze | grep -v '^pkg[-_]resources='
@@ -34,3 +27,24 @@ test:
 coverage:
 	coverage run --source rwm -m pytest tests/ -x -vv
 	coverage report --show-missing --fail-under 100
+
+microceph-service:
+	snap install microceph
+	snap refresh --hold microceph
+	/snap/bin/microceph cluster bootstrap
+	/snap/bin/microceph disk add loop,1G,3
+	/snap/bin/microceph enable rgw
+	while true; do /snap/bin/ceph status | grep "HEALTH_OK" && break; done
+	# required for gitlab runner shell executor which runs as non-privileged user
+	ln -sf /var/snap/microceph/current/conf /etc/ceph
+	chmod 644 /etc/ceph/*
+
+microceph-cleanup:
+	snap remove microceph --purge
+	rm /etc/ceph
+
+microceph: microceph-cleanup microceph-service
+
+runner:
+	apt-get install -y ansible
+	ansible-playbook ansible/playbook_gitlab_runner.yml
