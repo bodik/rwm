@@ -47,7 +47,7 @@ def test_storage_create(
     """test manager storage_create"""
 
     bucket = radosuser_admin.storage_create("testbuckx", "test1")
-    
+
     assert radosuser_admin.list_objects(bucket.name) == []
     assert radosuser_admin.storage_check_policy(bucket.name)
 
@@ -70,7 +70,6 @@ def test_storage_delete(
     target_username = "test1"
     bucket = radosuser_admin.storage_create(bucket_name, target_username)
 
-    # 
     bucket = radosuser_test1.s3.Bucket(bucket.name)
     bucket.upload_fileobj(BytesIO(b"dummydata"), "dummykey")
     assert len(radosuser_test1.list_objects(bucket.name)) == 1
@@ -100,7 +99,7 @@ def test_storage_check_policy(
 
     bucket_name = "rwmbackup-test1"
     target_username = "test1"
-    
+
     assert radosuser_admin.bucket_create(bucket_name)
     assert not radosuser_admin.storage_check_policy(bucket_name)
     radosuser_admin.storage_delete(bucket_name)
@@ -145,3 +144,18 @@ def test_storage_backup_usage(
 
     with pytest.raises(radosuser_test1.s3.meta.client.exceptions.ClientError, match=r"AccessDenied"):
         assert radosuser_test1.storage_delete(bucket_name)
+
+
+def test_storage_list(
+    tmpworkdir: str,
+    microceph: str,
+    radosuser_admin: rwm.StorageManager,
+):  # pylint: disable=unused-argument
+    """test managet list storage"""
+
+    bucket_name = "rwmbackup-test1"
+    target_username = "test1"
+
+    radosuser_admin.bucket_create("no-acl-dummy")
+    radosuser_admin.storage_create(bucket_name, target_username)
+    assert radosuser_admin.storage_list()

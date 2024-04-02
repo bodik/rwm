@@ -33,22 +33,16 @@ RWM can:
 * restic with S3 repository
 * configurable backup manager/executor
 
+* create, delete and list policed storage buckets
+* check if used bucket is configured with expected policies
 
-todo:
-
-* check if used bucket is configured for versioning
-* check if used access_key does not have administrator privileges to manipulate
-  with WORM policies
+TODO:
 * generate and store current bucket state state-data
 * recreate bucket contents on local filesystem (or remote bucket) acording to specified
   state data
 * ??? check completeness of the current state of the bucket
 * prune all non-recent object versions to reclaim storage space
-
-
-TBD:
 * unlike in other backup solutions, attacker with credentials can restore any old data from the repository/bucket
-* number of object files vs size
 
 
 ## Usage
@@ -61,45 +55,14 @@ make install
 ```
 
 
-### Low-level S3
-
-```
-cp examples/rwm-rclone.conf rwm.conf
-rwm aws s3 ls s3://
-rwm aws s3api list-buckets
-rwm rclone lsd rwmbe:/
-```
-
-
-### Simple copy: rclone with crypt overlay
-
-rclone_crypt defines single default remote named "rwmbe:/" pointed to `rwm_rclone_crypt_bucket` path.
-
-```
-cp examples/rwm-rclone.conf rwm.conf
-rwm rclone_crypt sync /data rwmbe:/
-rwm rclone_crypt lsl rwmbe:/
-```
-
-
-### Restic: manual restic backup
-
-```
-cp examples/rwm-restic.conf rwm.conf
-rwm restic init
-rwm restic backup /data
-rwm restic snapshots
-rwm restic mount /mnt/restore
-```
-
-
 ### RWM: simple backups
 
-backups follows standard restic procedures, but adds profile like configuration to easily run in schedulers
+Backups follows standard restic procedures, but adds profile like configuration
+to easily run in schedulers.
 
 ```
 cp examples/rwm-backups.conf rwm.conf
-rwm restic init  # should create bucket on it's own
+rwm restic init
 
 rwm backup_all
 rwm restic snapshots
@@ -109,7 +72,7 @@ rwm restic mount /mnt/restore
 
 ### RWM: backups with policed buckets
 
-Have two S3 accounts (*admin* and *user1*), create storage bucket and use it.
+Two distinct S3 accounts required (*admin*, *user1*)
 
 ```
 cp examples/rwm-admin.conf admin.conf
@@ -122,6 +85,38 @@ rwm restic init
 rwm storage_check_policy bucket1
 
 rwm backup_all
+rwm restic snapshots
+rwm restic mount /mnt/restore
+```
+
+
+### Other usages
+
+#### AWS cli
+
+```
+cp examples/rwm-rclone.conf rwm.conf
+rwm aws s3 ls s3://
+rwm aws s3api list-buckets
+rwm rclone lsd rwmbe:/
+```
+
+#### rclone with crypt overlay
+
+rclone_crypt defines single default remote named "rwmbe:/" pointed to `rwm_rclone_crypt_bucket` path.
+
+```
+cp examples/rwm-rclone.conf rwm.conf
+rwm rclone_crypt sync /data rwmbe:/
+rwm rclone_crypt lsl rwmbe:/
+```
+
+#### Restic: manual restic backup
+
+```
+cp examples/rwm-restic.conf rwm.conf
+rwm restic init
+rwm restic backup /data
 rwm restic snapshots
 rwm restic mount /mnt/restore
 ```

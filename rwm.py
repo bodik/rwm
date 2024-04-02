@@ -105,6 +105,18 @@ class BackupResult:
 class StorageManager:
     """s3 policed bucket manager"""
 
+    USER_BUCKET_POLICY_ACTIONS = [
+        # backups
+        "s3:ListBucket",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        # check policies
+        "s3:GetBucketPolicy",
+        "s3:ListBucketVersions",
+        "s3:GetBucketVersioning"
+    ]
+
     def __init__(self, url, access_key, secret_key):
         self.url = url
         self.access_key = access_key
@@ -131,7 +143,8 @@ class StorageManager:
         try:
             return json.loads(self.s3.Bucket(name).Policy().policy)
         except (botocore.exceptions.ClientError, botocore.exceptions.BotoCoreError) as exc:
-            logger.error("rwm bucket_policy error, %s", (exc))
+            if "NoSuchBucketPolicy" not in str(exc):
+                logger.error("rwm bucket_policy error, %s", (exc))
             return None
 
     def list_buckets(self):
@@ -149,16 +162,16 @@ class StorageManager:
             raise ValueError("must specify value for bucket and user")
 
         bucket = self.bucket_create(bucket_name)
-        tenant, manager_username = bucket.Acl().owner["ID"].split("$")
+        tenant, admin_username = bucket.Acl().owner["ID"].split("$")
 
         # grants basic RW access to user in same tenant
         bucket_policy = {
             "Version": "2012-10-17",
             "Statement": [
-                # full access to manager
+                # full access to admin
                 {
                     "Effect": "Allow",
-                    "Principal": {"AWS": [f"arn:aws:iam::{tenant}:user/{manager_username}"]},
+                    "Principal": {"AWS": [f"arn:aws:iam::{tenant}:user/{admin_username}"]},
                     "Action": ["*"],
                     "Resource": [f"arn:aws:s3:::{bucket.name}", f"arn:aws:s3:::{bucket.name}/*"]
                 },
@@ -166,10 +179,7 @@ class StorageManager:
                 {
                     "Effect": "Allow",
                     "Principal": {"AWS": [f"arn:aws:iam::{tenant}:user/{target_username}"]},
-                    "Action": [
-                        "s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject",
-                        "s3:GetBucketPolicy", "s3:ListBucketVersions", "s3:GetBucketVersioning"
-                    ],
+                    "Action": self.USER_BUCKET_POLICY_ACTIONS,
                     "Resource": [f"arn:aws:s3:::{bucket.name}", f"arn:aws:s3:::{bucket.name}/*"]
                 }
             ]
@@ -180,7 +190,7 @@ class StorageManager:
         bucket.Versioning().enable()
 
         return bucket
-    
+
     def storage_delete(self, bucket_name):
         """storage delete"""
 
@@ -189,20 +199,61 @@ class StorageManager:
         bucket.object_versions.all().delete()
         bucket.delete()
 
+    @staticmethod
+    def _policy_statements_admin(policy):
+        """policy helper"""
+        return list(filter(lambda stmt: stmt["Action"] == ["*"], policy["Statement"]))
+
+    @staticmethod
+    def _policy_statements_user(policy):
+        """policy helper"""
+        return list(filter(lambda stmt: stmt["Action"] != ["*"], policy["Statement"]))
+
     def storage_check_policy(self, name):
         """storage check bucket policy"""
 
         if not (policy := self.bucket_policy(name)):
             return False
 
-        if (
+        admin_statements = self._policy_statements_admin(policy)
+        user_statements = self._policy_statements_user(policy)
+
+        if (  # pylint: disable=too-many-boolean-expressions
+            # only two expected statements should be present on a bucket
             len(policy["Statement"]) == 2
-            and len(list(filter(lambda stmt: stmt["Action"] == ["*"], policy["Statement"]))) == 1
+            and len(admin_statements) == 1
+            and len(user_statements) == 1
+            # with distinct identities for admin and user
+            and admin_statements[0]["Principal"] != user_statements[0]["Principal"]
+            # user should have only limited access
+            and sorted(self.USER_BUCKET_POLICY_ACTIONS) == sorted(user_statements[0]["Action"])
+            # the bucket should be versioned
             and self.s3.Bucket(name).Versioning().status == "Enabled"
         ):
             return True
-        
+
         return False
+
+    def storage_list(self):
+        """storage list"""
+
+        output = []
+        for item in self.list_buckets():
+            result = {
+                "name": item.name,
+                "policy": "OK" if self.storage_check_policy(item.name) else "FAILED",
+                "owner": self.bucket_owner(item.name).split("$")[-1]
+            }
+
+            if result["policy"] == "OK":
+                user_statement = self._policy_statements_user(self.bucket_policy(item.name))[0]
+                result["target_user"] = user_statement["Principal"]["AWS"][0].split("/")[-1]
+            else:
+                result["target_user"] = None
+
+            output.append(result)
+
+        return output
 
 
 class RWM:
@@ -311,8 +362,8 @@ class RWM:
     def backup_cmd(self, name) -> subprocess.CompletedProcess:
         """backup command"""
 
-        # TODO: check target backup policy, restic automatically creates 
-        # bucket if ot does not exist with null-policy
+        if not self.storage_manager.storage_check_policy(self.config["rwm_restic_bucket"]):
+            logger.warning("used bucket does not have expected policy")
 
         wrap_output(backup_proc := self._restic_backup(name))
         if backup_proc.returncode != 0:
@@ -383,11 +434,14 @@ class RWM:
         return ret
 
     def storage_list_cmd(self):
-        pass
+        """storage_list command"""
 
-    def storage_restore(self, bucket_name, target_username):
-        """https://gitlab.cesnet.cz/709/public/restic/aws/-/blob/main/bucket_copy.sh?ref_type=heads"""
-        pass
+        print(tabulate(
+            self.storage_manager.storage_list(),
+            headers="keys",
+            numalign="left"
+        ))
+        return 0
 
 
 def configure_logging(debug):
@@ -425,7 +479,7 @@ def parse_arguments(argv):
 
     backup_cmd_parser = subparsers.add_parser("backup", help="backup command")
     backup_cmd_parser.add_argument("name", help="backup config name")
-    subparsers.add_parser("backup_all", help="backup all command")
+    _ = subparsers.add_parser("backup_all", help="backup all command")
 
     storage_create_cmd_parser = subparsers.add_parser("storage_create", help="storage_create command")
     storage_create_cmd_parser.add_argument("bucket_name", help="bucket name")
@@ -434,6 +488,7 @@ def parse_arguments(argv):
     storage_delete_cmd_parser.add_argument("bucket_name", help="bucket name")
     storage_check_policy_cmd_parser = subparsers.add_parser("storage_check_policy", help="storage_check_policy command; use --debug to show policy")
     storage_check_policy_cmd_parser.add_argument("bucket_name", help="bucket name")
+    _ = subparsers.add_parser("storage_list", help="storage_list command")
 
     return parser.parse_args(argv)
 
@@ -478,6 +533,8 @@ def main(argv=None):
         ret = rwmi.storage_delete_cmd(args.bucket_name)
     if args.command == "storage_check_policy":
         ret = rwmi.storage_check_policy_cmd(args.bucket_name)
+    if args.command == "storage_list":
+        ret = rwmi.storage_list_cmd()
 
     logger.debug("rwm finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     return ret

@@ -142,7 +142,6 @@ def test_backup_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused
 def test_backup_cmd_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
     """test backup command"""
 
-    import os
     trwm = rwm.RWM({
         "rwm_s3_endpoint_url": motoserver,
         "rwm_s3_access_key": "dummy",
@@ -169,7 +168,7 @@ def test_backup_cmd_excludes(tmpworkdir: str, motoserver: str):  # pylint: disab
     Path("testdatadir/var/proc").mkdir()
     Path("testdatadir/var/proc/data").write_text("dummydata", encoding="utf-8")
 
-    assert trwm.restic_cmd(["init"]).returncode == 0 
+    assert trwm.restic_cmd(["init"]).returncode == 0
     assert trwm.backup_cmd("testcfg").returncode == 0
 
     snapshots = _restic_list_snapshots(trwm)
@@ -187,6 +186,7 @@ def test_backup_cmd_error_handling(tmpworkdir: str, motoserver: str):  # pylint:
     """test backup command err cases"""
 
     rwm_conf = {
+        "rwm_restic_bucket": "restictest",
         "rwm_backups": {
             "dummycfg": {"filesdirs": ["dummydir"]}
         }
@@ -285,3 +285,17 @@ def test_storage_check_policy_cmd(tmpworkdir: str, microceph: str, radosuser_adm
     mock = Mock(return_value=False)
     with patch.object(rwm.StorageManager, "storage_check_policy", mock):
         assert trwm.storage_check_policy_cmd("dummy") == 1
+
+
+def test_storage_list_cmd(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+    """test storage check policy command"""
+
+    trwm = rwm.RWM({
+        "rwm_s3_endpoint_url": radosuser_admin.url,
+        "rwm_s3_access_key": radosuser_admin.access_key,
+        "rwm_s3_secret_key": radosuser_admin.secret_key,
+    })
+
+    mock = Mock(return_value=[])
+    with patch.object(rwm.StorageManager, "storage_list", mock):
+        assert trwm.storage_list_cmd() == 0
