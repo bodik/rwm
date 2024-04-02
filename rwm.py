@@ -111,7 +111,7 @@ class StorageManager:
         self.secret_key = secret_key
         self.s3 = boto3.resource('s3', endpoint_url=url, aws_access_key_id=self.access_key, aws_secret_access_key=self.secret_key)
 
-    def create_bucket(self, name):
+    def bucket_create(self, name):
         """aws s3 resource api stub"""
         # boto3 client and resource api are not completely aligned
         # s3.Bucket("xyz").create() returns dict instead of s3.Bucket object
@@ -148,7 +148,7 @@ class StorageManager:
         if (not bucket_name) or (not target_username):
             raise ValueError("must specify value for bucket and user")
 
-        bucket = self.create_bucket(bucket_name)
+        bucket = self.bucket_create(bucket_name)
         tenant, manager_username = bucket.Acl().owner["ID"].split("$")
 
         # grants basic RW access to user in same tenant
@@ -284,15 +284,7 @@ class RWM:
         }
         return run_command(["restic"] + args, env=env)
 
-    def restic_autoinit(self) -> subprocess.CompletedProcess:
-        """runs restic init"""
-
-        logger.info("run restic_autoinit")
-        if (proc := self.restic_cmd(["cat", "config"])).returncode != 0:
-            proc = self.restic_cmd(["init"])
-        return proc
-
-    def restic_backup(self, name) -> subprocess.CompletedProcess:
+    def _restic_backup(self, name) -> subprocess.CompletedProcess:
         """runs restic backup by name"""
 
         logger.info(f"run restic_backup {name}")
@@ -305,7 +297,7 @@ class RWM:
 
         return self.restic_cmd(cmd_args)
 
-    def restic_forget_prune(self) -> subprocess.CompletedProcess:
+    def _restic_forget_prune(self) -> subprocess.CompletedProcess:
         """runs forget prune"""
 
         logger.info("run restic_forget_prune")
@@ -322,20 +314,14 @@ class RWM:
         # TODO: check target backup policy, restic automatically creates 
         # bucket if ot does not exist with null-policy
 
-        autoinit_proc = self.restic_autoinit()
-        if autoinit_proc.returncode != 0:
-            logger.error("restic autoinit failed")
-            wrap_output(autoinit_proc)
-            return autoinit_proc
-
-        wrap_output(backup_proc := self.restic_backup(name))
+        wrap_output(backup_proc := self._restic_backup(name))
         if backup_proc.returncode != 0:
-            logger.error("restic_backup failed")
+            logger.error("rwm _restic_backup failed")
             return backup_proc
 
-        wrap_output(forget_proc := self.restic_forget_prune())
+        wrap_output(forget_proc := self._restic_forget_prune())
         if forget_proc.returncode != 0:
-            logger.error("restic_forget_prune failed")
+            logger.error("rwm _restic_forget_prune failed")
             return forget_proc
 
         return backup_proc
@@ -346,25 +332,16 @@ class RWM:
         stats = {}
         ret = 0
 
-        time_start = datetime.now()
-        autoinit_proc = self.restic_autoinit()
-        time_end = datetime.now()
-        if autoinit_proc.returncode != 0:
-            logger.error("restic autoinit failed")
-            wrap_output(autoinit_proc)
-            return autoinit_proc.returncode
-        stats["_autoinit"] = BackupResult("_autoinit", autoinit_proc.returncode, time_start, time_end)
-
         for name in self.config["rwm_backups"].keys():
             time_start = datetime.now()
-            wrap_output(backup_proc := self.restic_backup(name))
+            wrap_output(backup_proc := self._restic_backup(name))
             time_end = datetime.now()
             ret |= backup_proc.returncode
             stats[name] = BackupResult(name, backup_proc.returncode, time_start, time_end)
 
         if ret == 0:
             time_start = datetime.now()
-            wrap_output(forget_proc := self.restic_forget_prune())
+            wrap_output(forget_proc := self._restic_forget_prune())
             time_end = datetime.now()
             ret |= forget_proc.returncode
             stats["_forget_prune"] = BackupResult("_forget_prune", forget_proc.returncode, time_start, time_end)
@@ -400,11 +377,7 @@ class RWM:
     def storage_check_policy_cmd(self, bucket_name) -> int:
         """storage check policy command"""
 
-        ret, msg = (
-            (0, "OK")
-            if self.storage_manager.storage_check_policy(bucket_name) == True
-            else (1, "FAILED")
-        )
+        ret, msg = (0, "OK") if self.storage_manager.storage_check_policy(bucket_name) else (1, "FAILED")
         logger.debug("bucket policy: %s", json.dumps(self.storage_manager.bucket_policy(bucket_name), indent=4))
         print(msg)
         return ret
@@ -498,6 +471,7 @@ def main(argv=None):
     if args.command == "backup_all":
         ret = rwmi.backup_all_cmd()
         logger.info("rwm backup_all finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
+
     if args.command == "storage_create":
         ret = rwmi.storage_create_cmd(args.bucket_name, args.target_username)
     if args.command == "storage_delete":

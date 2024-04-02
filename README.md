@@ -99,6 +99,8 @@ backups follows standard restic procedures, but adds profile like configuration 
 
 ```
 cp examples/rwm-backups.conf rwm.conf
+rwm restic init  # should create bucket on it's own
+
 rwm backup_all
 rwm restic snapshots
 rwm restic mount /mnt/restore
@@ -116,7 +118,9 @@ rwm --confg admin.conf storage_check_policy bucket1
 rwm --confg admin.conf storage_list
 
 cp examples/rwm-backups.conf rwm.conf
+rwm restic init
 rwm storage_check_policy bucket1
+
 rwm backup_all
 rwm restic snapshots
 rwm restic mount /mnt/restore
