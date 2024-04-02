@@ -3,6 +3,7 @@
 
 import base64
 import dataclasses
+import json
 import logging
 import os
 import shlex
@@ -12,6 +13,8 @@ from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
 
+import boto3
+import botocore
 import yaml
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
@@ -99,13 +102,121 @@ class BackupResult:
         }
 
 
+class StorageManager:
+    """s3 policed bucket manager"""
+
+    def __init__(self, url, access_key, secret_key):
+        self.url = url
+        self.access_key = access_key
+        self.secret_key = secret_key
+        self.s3 = boto3.resource('s3', endpoint_url=url, aws_access_key_id=self.access_key, aws_secret_access_key=self.secret_key)
+
+    def create_bucket(self, name):
+        """aws s3 resource api stub"""
+        # boto3 client and resource api are not completely aligned
+        # s3.Bucket("xyz").create() returns dict instead of s3.Bucket object
+        return self.s3.create_bucket(Bucket=name)
+
+    def bucket_exist(self, name):
+        """check if bucket exist"""
+        return name in [x.name for x in self.list_buckets()]
+
+    def bucket_owner(self, name):
+        """aws s3 resource api stub"""
+        return self.s3.Bucket(name).Acl().owner["ID"]
+
+    def bucket_policy(self, name):
+        """aws s3 resource api stub"""
+
+        try:
+            return json.loads(self.s3.Bucket(name).Policy().policy)
+        except (botocore.exceptions.ClientError, botocore.exceptions.BotoCoreError) as exc:
+            logger.error("rwm bucket_policy error, %s", (exc))
+            return None
+
+    def list_buckets(self):
+        """aws s3 resource api stub"""
+        return list(self.s3.buckets.all())
+
+    def list_objects(self, bucket_name):
+        """aws s3 resource api stub"""
+        return list(self.s3.Bucket(bucket_name).objects.all())
+
+    def storage_create(self, bucket_name, target_username):
+        """create policed bucket"""
+
+        if (not bucket_name) or (not target_username):
+            raise ValueError("must specify value for bucket and user")
+
+        bucket = self.create_bucket(bucket_name)
+        tenant, manager_username = bucket.Acl().owner["ID"].split("$")
+
+        # grants basic RW access to user in same tenant
+        bucket_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                # full access to manager
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": [f"arn:aws:iam::{tenant}:user/{manager_username}"]},
+                    "Action": ["*"],
+                    "Resource": [f"arn:aws:s3:::{bucket.name}", f"arn:aws:s3:::{bucket.name}/*"]
+                },
+                # limited access to user
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": [f"arn:aws:iam::{tenant}:user/{target_username}"]},
+                    "Action": [
+                        "s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject",
+                        "s3:GetBucketPolicy", "s3:ListBucketVersions", "s3:GetBucketVersioning"
+                    ],
+                    "Resource": [f"arn:aws:s3:::{bucket.name}", f"arn:aws:s3:::{bucket.name}/*"]
+                }
+            ]
+        }
+        bucket.Policy().put(Policy=json.dumps(bucket_policy))
+
+        # enforces versioning
+        bucket.Versioning().enable()
+
+        return bucket
+    
+    def storage_delete(self, bucket_name):
+        """storage delete"""
+
+        bucket = self.s3.Bucket(bucket_name)
+        bucket.objects.all().delete()
+        bucket.object_versions.all().delete()
+        bucket.delete()
+
+    def storage_check_policy(self, name):
+        """storage check bucket policy"""
+
+        if not (policy := self.bucket_policy(name)):
+            return False
+
+        if (
+            len(policy["Statement"]) == 2
+            and len(list(filter(lambda stmt: stmt["Action"] == ["*"], policy["Statement"]))) == 1
+            and self.s3.Bucket(name).Versioning().status == "Enabled"
+        ):
+            return True
+        
+        return False
+
+
 class RWM:
     """rwm impl"""
 
     def __init__(self, config):
         self.config = config
+        self.storage_manager = StorageManager(
+            config.get("rwm_s3_endpoint_url"),
+            config.get("rwm_s3_access_key"),
+            config.get("rwm_s3_secret_key")
+        )
 
-    def aws_cmd(self, args):
+    def aws_cmd(self, args) -> subprocess.CompletedProcess:
         """aws cli wrapper"""
 
         env = {
@@ -121,7 +232,7 @@ class RWM:
         # aws cli does not have endpoint-url as env config option
         return run_command(["aws", "--endpoint-url", self.config["rwm_s3_endpoint_url"]] + args, env=env)
 
-    def rclone_cmd(self, args):
+    def rclone_cmd(self, args) -> subprocess.CompletedProcess:
         """rclone wrapper"""
 
         env = {
@@ -136,7 +247,7 @@ class RWM:
         }
         return run_command(["rclone"] + args, env=env)
 
-    def rclone_crypt_cmd(self, args):
+    def rclone_crypt_cmd(self, args) -> subprocess.CompletedProcess:
         """
         rclone crypt wrapper
         * https://rclone.org/docs/#config-file
@@ -160,7 +271,7 @@ class RWM:
         }
         return run_command(["rclone"] + args, env=env)
 
-    def restic_cmd(self, args):
+    def restic_cmd(self, args) -> subprocess.CompletedProcess:
         """restic command wrapper"""
 
         env = {
@@ -173,7 +284,7 @@ class RWM:
         }
         return run_command(["restic"] + args, env=env)
 
-    def restic_autoinit(self):
+    def restic_autoinit(self) -> subprocess.CompletedProcess:
         """runs restic init"""
 
         logger.info("run restic_autoinit")
@@ -181,7 +292,7 @@ class RWM:
             proc = self.restic_cmd(["init"])
         return proc
 
-    def restic_backup(self, name):
+    def restic_backup(self, name) -> subprocess.CompletedProcess:
         """runs restic backup by name"""
 
         logger.info(f"run restic_backup {name}")
@@ -194,7 +305,7 @@ class RWM:
 
         return self.restic_cmd(cmd_args)
 
-    def restic_forget_prune(self):
+    def restic_forget_prune(self) -> subprocess.CompletedProcess:
         """runs forget prune"""
 
         logger.info("run restic_forget_prune")
@@ -205,8 +316,11 @@ class RWM:
 
         return self.restic_cmd(cmd_args)
 
-    def backup_cmd(self, name):
+    def backup_cmd(self, name) -> subprocess.CompletedProcess:
         """backup command"""
+
+        # TODO: check target backup policy, restic automatically creates 
+        # bucket if ot does not exist with null-policy
 
         autoinit_proc = self.restic_autoinit()
         if autoinit_proc.returncode != 0:
@@ -226,7 +340,7 @@ class RWM:
 
         return backup_proc
 
-    def backup_all_cmd(self):
+    def backup_all_cmd(self) -> int:
         """backup all command"""
 
         stats = {}
@@ -258,6 +372,49 @@ class RWM:
         logger.info("rwm backup_all results")
         print(tabulate([item.to_dict() for item in stats.values()], headers="keys", numalign="left"))
         return ret
+
+    def storage_create_cmd(self, bucket_name, target_username) -> int:
+        """storage create command"""
+
+        try:
+            self.storage_manager.storage_create(bucket_name, target_username)
+        except (
+            botocore.exceptions.ClientError,
+            botocore.exceptions.BotoCoreError,
+            ValueError
+        ) as exc:
+            logger.error("rwm storage_create error, %s", (exc))
+            return 1
+        return 0
+
+    def storage_delete_cmd(self, bucket_name) -> int:
+        """storage delete command"""
+
+        try:
+            self.storage_manager.storage_delete(bucket_name)
+        except (botocore.exceptions.ClientError, botocore.exceptions.BotoCoreError) as exc:
+            logger.error("rwm storage_delete error, %s", (exc))
+            return 1
+        return 0
+
+    def storage_check_policy_cmd(self, bucket_name) -> int:
+        """storage check policy command"""
+
+        ret, msg = (
+            (0, "OK")
+            if self.storage_manager.storage_check_policy(bucket_name) == True
+            else (1, "FAILED")
+        )
+        logger.debug("bucket policy: %s", json.dumps(self.storage_manager.bucket_policy(bucket_name), indent=4))
+        print(msg)
+        return ret
+
+    def storage_list_cmd(self):
+        pass
+
+    def storage_restore(self, bucket_name, target_username):
+        """https://gitlab.cesnet.cz/709/public/restic/aws/-/blob/main/bucket_copy.sh?ref_type=heads"""
+        pass
 
 
 def configure_logging(debug):
@@ -297,6 +454,14 @@ def parse_arguments(argv):
     backup_cmd_parser.add_argument("name", help="backup config name")
     subparsers.add_parser("backup_all", help="backup all command")
 
+    storage_create_cmd_parser = subparsers.add_parser("storage_create", help="storage_create command")
+    storage_create_cmd_parser.add_argument("bucket_name", help="bucket name")
+    storage_create_cmd_parser.add_argument("target_username", help="actual bucket user with limited RW access")
+    storage_delete_cmd_parser = subparsers.add_parser("storage_delete", help="storage_delete command")
+    storage_delete_cmd_parser.add_argument("bucket_name", help="bucket name")
+    storage_check_policy_cmd_parser = subparsers.add_parser("storage_check_policy", help="storage_check_policy command; use --debug to show policy")
+    storage_check_policy_cmd_parser.add_argument("bucket_name", help="bucket name")
+
     return parser.parse_args(argv)
 
 
@@ -333,7 +498,14 @@ def main(argv=None):
     if args.command == "backup_all":
         ret = rwmi.backup_all_cmd()
         logger.info("rwm backup_all finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
+    if args.command == "storage_create":
+        ret = rwmi.storage_create_cmd(args.bucket_name, args.target_username)
+    if args.command == "storage_delete":
+        ret = rwmi.storage_delete_cmd(args.bucket_name)
+    if args.command == "storage_check_policy":
+        ret = rwmi.storage_check_policy_cmd(args.bucket_name)
 
+    logger.debug("rwm finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     return ret
 
 

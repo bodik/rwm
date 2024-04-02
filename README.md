@@ -105,10 +105,29 @@ rwm restic mount /mnt/restore
 ```
 
 
+### RWM: backups with policed buckets
+
+Have two S3 accounts (*admin* and *user1*), create storage bucket and use it.
+
+```
+cp examples/rwm-admin.conf admin.conf
+rwm --confg admin.conf create_storage bucket1 user1
+rwm --confg admin.conf storage_check_policy bucket1
+rwm --confg admin.conf storage_list
+
+cp examples/rwm-backups.conf rwm.conf
+rwm storage_check_policy bucket1
+rwm backup_all
+rwm restic snapshots
+rwm restic mount /mnt/restore
+```
+
+
 ## Notes
 
 * executed tools stdout is buffered, eg. `restic mount` does not print immediate output as normal
 * passthrough full arguments to underlying tool with "--" (eg. `rwm rclone -- ls --help`).
+* runner microceph breaks on reboot because of symlink at /etc/ceph
 
 
 ## Development
@@ -132,3 +151,11 @@ export RUNNER_URL=
 export RUNNER_TOKEN=
 make runner
 ```
+
+
+## References
+
+* https://restic.readthedocs.io/
+* https://github.com/CESNET/aws-plugin-bucket-policy
+* https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html
+* https://aws.amazon.com/blogs/storage/point-in-time-restore-for-amazon-s3-buckets/

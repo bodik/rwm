@@ -39,7 +39,7 @@ def test_wrap_output():
 def test_main(tmpworkdir: str):  # pylint: disable=unused-argument
     """test main"""
 
-    # optional and default config hanling
+    # optional and default config handling
     assert rwm_main(["version"]) == 0
     Path("rwm.conf").touch()
     assert rwm_main(["version"]) == 0
@@ -51,8 +51,16 @@ def test_main(tmpworkdir: str):  # pylint: disable=unused-argument
             assert rwm_main([item, "dummy"]) == 0
 
     mock = Mock(return_value=0)
+
     with patch.object(rwm.RWM, "backup_all_cmd", mock):
         assert rwm_main(["backup_all"]) == 0
+
+    with patch.object(rwm.RWM, "storage_create_cmd", mock):
+        assert rwm_main(["storage_create", "bucket", "user"]) == 0
+
+    for item in ["storage_delete", "storage_check_policy"]:
+        with patch.object(rwm.RWM, f"{item}_cmd", mock):
+            assert rwm_main([item, "bucket"]) == 0
 
 
 def test_aws_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
@@ -243,7 +251,7 @@ def test_backup_cmd_excludes(tmpworkdir: str, motoserver: str):  # pylint: disab
     assert "/testdatadir/proc/to_be_also_excluded" not in snapshot_files
     assert "/testdatadir/processor" in snapshot_files
     assert "/testdatadir/some_other_proc_essor" in snapshot_files
-    # following expected result does not work , because test config uses root-unanchored exclude path "proc/*"
+    # following expected result does not work, because test config uses root-unanchored exclude path "proc/*"
     # assert "/testdatadir/var/proc/data" in snapshot_files
 
 
@@ -305,3 +313,67 @@ def test_backup_all_cmd_error_handling(tmpworkdir: str):  # pylint: disable=unus
 
     with patch.object(rwm.RWM, "restic_autoinit", mock_fail):
         assert RWM(rwm_conf).backup_all_cmd() == 11
+
+
+def test_storage_create_cmd(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+    """test_storage_create_cmd"""
+
+    trwm = rwm.RWM({
+        "rwm_s3_endpoint_url": radosuser_admin.url,
+        "rwm_s3_access_key": radosuser_admin.access_key,
+        "rwm_s3_secret_key": radosuser_admin.secret_key,
+    })
+
+    bucket_name = "testbuck"
+    assert trwm.storage_create_cmd(bucket_name, "testnx") == 0
+    assert trwm.storage_create_cmd("!invalid", "testnx") == 1
+    assert trwm.storage_create_cmd("", "testnx") == 1
+
+
+def test_storage_delete_cmd(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+    """test_storage_create_cmd"""
+
+    trwm = rwm.RWM({
+        "rwm_s3_endpoint_url": radosuser_admin.url,
+        "rwm_s3_access_key": radosuser_admin.access_key,
+        "rwm_s3_secret_key": radosuser_admin.secret_key,
+
+        "rwm_restic_bucket": "testbuck",
+        "rwm_restic_password": "dummydummydummydummy",
+        "rwm_backups": {
+            "testcfg": {"filesdirs": ["testdatadir/"]}
+        }
+    })
+
+    bucket_name = trwm.config["rwm_restic_bucket"]
+    Path("testdatadir").mkdir()
+    Path("testdatadir/testdata1.txt").write_text("dummydata", encoding="utf-8")
+
+    bucket = trwm.storage_manager.storage_create(bucket_name, "admin")
+    assert trwm.storage_manager.bucket_exist(bucket_name)
+    assert len(trwm.storage_manager.list_objects(bucket_name)) == 0
+
+    assert trwm.backup_cmd("testcfg").returncode == 0
+    assert len(trwm.storage_manager.list_objects(bucket_name)) != 0
+
+    object_versions = radosuser_admin.s3.meta.client.list_object_versions(Bucket=bucket.name)
+    assert len(object_versions["Versions"]) > 0
+    assert len(object_versions["DeleteMarkers"]) > 0
+
+    assert trwm.storage_delete_cmd(bucket_name) == 0
+    assert not trwm.storage_manager.bucket_exist(bucket_name)
+    assert trwm.storage_delete_cmd(bucket_name) == 1
+
+
+def test_storage_check_policy_cmd(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+    """test storage check policy command"""
+
+    trwm = rwm.RWM({
+        "rwm_s3_endpoint_url": radosuser_admin.url,
+        "rwm_s3_access_key": radosuser_admin.access_key,
+        "rwm_s3_secret_key": radosuser_admin.secret_key,
+    })
+
+    mock = Mock(return_value=False)
+    with patch.object(rwm.StorageManager, "storage_check_policy", mock):
+        assert trwm.storage_check_policy_cmd("dummy") == 1

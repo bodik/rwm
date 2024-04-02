@@ -22,6 +22,7 @@ lint-yaml:
 	yamllint --strict .
 
 test:
+	# show stderr with "-o log_cli=true"
 	python3 -m pytest -v tests/
 
 coverage:
