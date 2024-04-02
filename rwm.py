@@ -198,6 +198,7 @@ class StorageManager:
         bucket.objects.all().delete()
         bucket.object_versions.all().delete()
         bucket.delete()
+        return 0
 
     @staticmethod
     def _policy_statements_admin(policy):
@@ -254,6 +255,24 @@ class StorageManager:
             output.append(result)
 
         return output
+
+    def storage_drop_versions(self, bucket_name):
+        """deletes all old versions and delete markers from storage to reclaim space"""
+
+        # ? lock repo
+
+        # drop all active object versions
+        object_versions = self.s3.meta.client.list_object_versions(Bucket=bucket_name)
+        for item in object_versions["Versions"]:
+            if not item["IsLatest"]:
+                self.s3.ObjectVersion(bucket_name, item["Key"], item["VersionId"]).delete()
+
+        # drop all delete markers
+        object_versions = self.s3.meta.client.list_object_versions(Bucket=bucket_name)
+        for item in object_versions["DeleteMarkers"]:
+            self.s3.ObjectVersion(bucket_name, item["Key"], item["VersionId"]).delete()
+
+        return 0
 
 
 class RWM:
@@ -443,6 +462,11 @@ class RWM:
         ))
         return 0
 
+    def storage_drop_versions_cmd(self, bucket_name):
+        """storage_drop_versions command"""
+
+        return self.storage_manager.storage_drop_versions(bucket_name)
+
 
 def configure_logging(debug):
     """configure logger"""
@@ -466,34 +490,45 @@ def parse_arguments(argv):
     parser.add_argument("--config", default="rwm.conf")
 
     subparsers = parser.add_subparsers(title="commands", dest="command", required=False)
+
     subparsers.add_parser("version", help="show version")
 
-    aws_cmd_parser = subparsers.add_parser("aws", help="aws command")
+    aws_cmd_parser = subparsers.add_parser("aws", help="run aws cli")
     aws_cmd_parser.add_argument("cmd_args", nargs="*")
-    rc_cmd_parser = subparsers.add_parser("rclone", help="rclone command")
-    rc_cmd_parser.add_argument("cmd_args", nargs="*")
-    rcc_cmd_parser = subparsers.add_parser("rclone_crypt", help="rclone command with crypt overlay")
-    rcc_cmd_parser.add_argument("cmd_args", nargs="*")
-    res_cmd_parser = subparsers.add_parser("restic", help="restic command")
-    res_cmd_parser.add_argument("cmd_args", nargs="*")
+    rclone_cmd_parser = subparsers.add_parser("rclone", help="run rclone")
+    rclone_cmd_parser.add_argument("cmd_args", nargs="*")
+    rclone_crypt_cmd_parser = subparsers.add_parser("rclone_crypt", help="run rclone with crypt overlay")
+    rclone_crypt_cmd_parser.add_argument("cmd_args", nargs="*")
+    restic_cmd_parser = subparsers.add_parser("restic", help="run restic")
+    restic_cmd_parser.add_argument("cmd_args", nargs="*")
 
-    backup_cmd_parser = subparsers.add_parser("backup", help="backup command")
-    backup_cmd_parser.add_argument("name", help="backup config name")
-    _ = subparsers.add_parser("backup_all", help="backup all command")
+    backup_cmd_parser = subparsers.add_parser("backup", help="perform backup")
+    backup_cmd_parser.add_argument("name", help="backup name")
 
-    storage_create_cmd_parser = subparsers.add_parser("storage_create", help="storage_create command")
+    _ = subparsers.add_parser("backup_all", help="run all backups in config")
+
+    storage_create_cmd_parser = subparsers.add_parser("storage_create", help="create policed storage bucked")
     storage_create_cmd_parser.add_argument("bucket_name", help="bucket name")
-    storage_create_cmd_parser.add_argument("target_username", help="actual bucket user with limited RW access")
-    storage_delete_cmd_parser = subparsers.add_parser("storage_delete", help="storage_delete command")
+    storage_create_cmd_parser.add_argument("target_username", help="user to be granted limited RW access")
+
+    storage_delete_cmd_parser = subparsers.add_parser("storage_delete", help="delete storage")
     storage_delete_cmd_parser.add_argument("bucket_name", help="bucket name")
-    storage_check_policy_cmd_parser = subparsers.add_parser("storage_check_policy", help="storage_check_policy command; use --debug to show policy")
+
+    storage_check_policy_cmd_parser = subparsers.add_parser("storage_check_policy", help="check bucket policies; use --debug to show policy")
     storage_check_policy_cmd_parser.add_argument("bucket_name", help="bucket name")
-    _ = subparsers.add_parser("storage_list", help="storage_list command")
+
+    _ = subparsers.add_parser("storage_list", help="list storages")
+
+    storage_drop_versions_cmd_parser = subparsers.add_parser(
+        "storage_drop_versions",
+        help="reclaim storage space; drops any old object versions from bucket"
+    )
+    storage_drop_versions_cmd_parser.add_argument("bucket_name", help="bucket name")
 
     return parser.parse_args(argv)
 
 
-def main(argv=None):
+def main(argv=None):  # pylint: disable=too-many-branches
     """main"""
 
     args = parse_arguments(argv)
@@ -505,12 +540,12 @@ def main(argv=None):
     logger.debug("config, %s", config)
     # assert config ?
     rwmi = RWM(config)
+    ret = -1
 
     if args.command == "version":
         print(__version__)
-        return 0
+        ret = 0
 
-    ret = -1
     if args.command == "aws":
         ret = wrap_output(rwmi.aws_cmd(args.cmd_args))
     if args.command == "rclone":
@@ -535,6 +570,8 @@ def main(argv=None):
         ret = rwmi.storage_check_policy_cmd(args.bucket_name)
     if args.command == "storage_list":
         ret = rwmi.storage_list_cmd()
+    if args.command == "storage_drop_versions":
+        ret = rwmi.storage_drop_versions_cmd(args.bucket_name)
 
     logger.debug("rwm finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     return ret

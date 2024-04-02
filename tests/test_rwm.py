@@ -273,29 +273,31 @@ def test_storage_delete_cmd(tmpworkdir: str, microceph: str, radosuser_admin: rw
     assert trwm.storage_delete_cmd(bucket_name) == 1
 
 
-def test_storage_check_policy_cmd(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+def test_storage_check_policy_cmd(tmpworkdir: str):  # pylint: disable=unused-argument
     """test storage check policy command"""
 
-    trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": radosuser_admin.url,
-        "rwm_s3_access_key": radosuser_admin.access_key,
-        "rwm_s3_secret_key": radosuser_admin.secret_key,
-    })
+    trwm = rwm.RWM({})
 
     mock = Mock(return_value=False)
     with patch.object(rwm.StorageManager, "storage_check_policy", mock):
         assert trwm.storage_check_policy_cmd("dummy") == 1
 
 
-def test_storage_list_cmd(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+def test_storage_list_cmd(tmpworkdir: str):  # pylint: disable=unused-argument
     """test storage check policy command"""
 
-    trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": radosuser_admin.url,
-        "rwm_s3_access_key": radosuser_admin.access_key,
-        "rwm_s3_secret_key": radosuser_admin.secret_key,
-    })
+    trwm = rwm.RWM({})
 
     mock = Mock(return_value=[])
     with patch.object(rwm.StorageManager, "storage_list", mock):
         assert trwm.storage_list_cmd() == 0
+
+
+def test_storage_drop_versions_cmd(tmpworkdir: str):  # pylint: disable=unused-argument
+    """test storage drop versions command"""
+
+    trwm = rwm.RWM({})
+
+    mock = Mock(return_value=0)
+    with patch.object(rwm.StorageManager, "storage_drop_versions", mock):
+        assert trwm.storage_drop_versions_cmd("dummy") == 0

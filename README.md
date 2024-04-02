@@ -26,23 +26,25 @@ versions of the bucket objects reclaiming free space on the underlying storage. 
 must be delegated to secure element residing outside of attacker's reach and would use privileged
 credentials for the managed bucket.
 
-RWM can:
+
+## Features
 
 * low-level S3 access for aws cli and rclone
 * rclone "crypt over S3" backend
 * restic with S3 repository
-* configurable backup manager/executor
-
-* create, delete and list policed storage buckets
-* check if used bucket is configured with expected policies
+* simple backup manager/executor
+* storage manager
+  * create, delete and list policed storage buckets
+  * check if used bucket is configured with expected policies
+  * drop all versions to reclaim storage space
 
 TODO:
 * generate and store current bucket state state-data
 * recreate bucket contents on local filesystem (or remote bucket) acording to specified
   state data
 * ??? check completeness of the current state of the bucket
-* prune all non-recent object versions to reclaim storage space
-* unlike in other backup solutions, attacker with credentials can restore any old data from the repository/bucket
+* unlike in other backup solutions, attacker with credentials can restore
+  old data from the repository/bucket, this should be discussed (howto threat modeling ?)
 
 
 ## Usage
@@ -87,6 +89,9 @@ rwm storage_check_policy bucket1
 rwm backup_all
 rwm restic snapshots
 rwm restic mount /mnt/restore
+
+# if current storage state is consistent, one can drop old object versions from time to time to reclaim storage space
+rwm --confg admin.conf storage_drop_versions bucket1
 ```
 
 

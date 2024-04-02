@@ -159,3 +159,29 @@ def test_storage_list(
     radosuser_admin.bucket_create("no-acl-dummy")
     radosuser_admin.storage_create(bucket_name, target_username)
     assert radosuser_admin.storage_list()
+
+
+def test_storage_drop_versions(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+    """test manager storage_drop_versions"""
+
+    bucket_name = "testbuckx"
+    target_username = "test1"
+    bucket = radosuser_admin.storage_create(bucket_name, target_username)
+
+    bucket.upload_fileobj(BytesIO(b"dummydata1"), "dummykey")
+    bucket.upload_fileobj(BytesIO(b"dummydata2"), "dummykey")
+    bucket.Object("dummykey").delete()
+    bucket.upload_fileobj(BytesIO(b"dummydata3"), "dummykey")
+
+    # boto3 resource api
+    object_versions = list(bucket.object_versions.all())
+    assert len(object_versions) == 4
+    # boto3 client api
+    object_versions = radosuser_admin.s3.meta.client.list_object_versions(Bucket=bucket.name)
+    assert len(object_versions["Versions"]) == 3
+    assert len(object_versions["DeleteMarkers"]) == 1
+
+    assert radosuser_admin.storage_drop_versions(bucket.name) == 0
+
+    object_versions = list(bucket.object_versions.all())
+    assert len(object_versions) == 1

@@ -56,3 +56,5 @@ def test_main(tmpworkdir: str):  # pylint: disable=unused-argument
         assert rwm_main(["storage_check_policy", "bucket"]) == 0
     with patch.object(rwm.RWM, "storage_list_cmd", mock_ok):
         assert rwm_main(["storage_list"]) == 0
+    with patch.object(rwm.RWM, "storage_drop_versions_cmd", mock_ok):
+        assert rwm_main(["storage_drop_versions", "bucket"]) == 0
