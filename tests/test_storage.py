@@ -1,6 +1,7 @@
 """rwm storagemanager and bucket policing tests"""
 
 import json
+import os
 from io import BytesIO
 from pathlib import Path
 
@@ -187,6 +188,7 @@ def test_storage_drop_versions(tmpworkdir: str, microceph: str, radosuser_admin:
     assert len(object_versions) == 1
 
 
+@pytest.mark.skipif('PYTEST_SLOW' not in os.environ, reason='slow on devnode, runs in CI')
 def test_storage_drop_versions_many(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
     """test manager storage_drop_versions"""
 

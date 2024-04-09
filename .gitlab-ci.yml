@@ -14,5 +14,5 @@ code_quality:
     - venv/bin/pip install -U pip
     - venv/bin/pip install -r requirements.lock
   script:
-    - . venv/bin/activate && make coverage
+    - . venv/bin/activate && PYTEST_SLOW=1 make coverage
     - . venv/bin/activate && make lint
