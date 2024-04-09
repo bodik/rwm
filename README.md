@@ -47,7 +47,6 @@ TODO:
   old data from the repository/bucket, this should be discussed (howto threat modeling ?)
 * rgw leaks objects on tests
 
-* rwm drop _cmd from methods which are not other commands wrapper
 * fix microceph start on node reboot
 * drop rclone use-cases
 

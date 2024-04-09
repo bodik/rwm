@@ -105,8 +105,8 @@ def _restic_list_snapshot_files(trwm, snapshot_id):
     return [x["path"] for x in snapshot_ls if (x["struct_type"] == "node") and (x["type"] == "file")]
 
 
-def test_backup_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
-    """test backup_cmd command"""
+def test_backup(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
+    """test backup"""
 
     trwm = rwm.RWM({
         "rwm_s3_endpoint_url": motoserver,
@@ -131,7 +131,7 @@ def test_backup_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused
     Path("testdatadir/testfile_to_be_ignored").write_text("dummydata", encoding="utf-8")
 
     assert trwm.restic_cmd(["init"]).returncode == 0
-    assert trwm.backup_cmd("testcfg").returncode == 0
+    assert trwm.backup("testcfg").returncode == 0
 
     snapshots = _restic_list_snapshots(trwm)
     assert len(snapshots) == 1
@@ -139,8 +139,8 @@ def test_backup_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused
     assert "/testdatadir/testdata1.txt" in snapshot_files
 
 
-def test_backup_cmd_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
-    """test backup command"""
+def test_backup_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
+    """test backu"""
 
     trwm = rwm.RWM({
         "rwm_s3_endpoint_url": motoserver,
@@ -169,7 +169,7 @@ def test_backup_cmd_excludes(tmpworkdir: str, motoserver: str):  # pylint: disab
     Path("testdatadir/var/proc/data").write_text("dummydata", encoding="utf-8")
 
     assert trwm.restic_cmd(["init"]).returncode == 0
-    assert trwm.backup_cmd("testcfg").returncode == 0
+    assert trwm.backup("testcfg").returncode == 0
 
     snapshots = _restic_list_snapshots(trwm)
     assert len(snapshots) == 1
@@ -182,7 +182,7 @@ def test_backup_cmd_excludes(tmpworkdir: str, motoserver: str):  # pylint: disab
     assert "/testdatadir/var/proc/data" in snapshot_files
 
 
-def test_backup_cmd_error_handling(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
+def test_backup_error_handling(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
     """test backup command err cases"""
 
     rwm_conf = {
@@ -197,17 +197,17 @@ def test_backup_cmd_error_handling(tmpworkdir: str, motoserver: str):  # pylint:
     with (
         patch.object(rwm.RWM, "_restic_backup", mock_fail)
     ):
-        assert rwm.RWM(rwm_conf).backup_cmd("dummycfg").returncode == 11
+        assert rwm.RWM(rwm_conf).backup("dummycfg").returncode == 11
 
     with (
         patch.object(rwm.RWM, "_restic_backup", mock_ok),
         patch.object(rwm.RWM, "_restic_forget_prune", mock_fail)
     ):
-        assert rwm.RWM(rwm_conf).backup_cmd("dummycfg").returncode == 11
+        assert rwm.RWM(rwm_conf).backup("dummycfg").returncode == 11
 
 
-def test_backup_all_cmd(tmpworkdir: str):  # pylint: disable=unused-argument
-    """test backup command err cases"""
+def test_backup_all(tmpworkdir: str):  # pylint: disable=unused-argument
+    """test backup_all"""
 
     rwm_conf = {
         "rwm_backups": {
@@ -220,11 +220,11 @@ def test_backup_all_cmd(tmpworkdir: str):  # pylint: disable=unused-argument
         patch.object(rwm.RWM, "_restic_backup", mock),
         patch.object(rwm.RWM, "_restic_forget_prune", mock)
     ):
-        assert rwm.RWM(rwm_conf).backup_all_cmd() == 0
+        assert rwm.RWM(rwm_conf).backup_all() == 0
 
 
-def test_storage_create_cmd(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
-    """test_storage_create_cmd"""
+def test_storage_create(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+    """test_storage_create"""
 
     trwm = rwm.RWM({
         "rwm_s3_endpoint_url": radosuser_admin.url,
@@ -233,13 +233,13 @@ def test_storage_create_cmd(tmpworkdir: str, microceph: str, radosuser_admin: rw
     })
 
     bucket_name = "testbuck"
-    assert trwm.storage_create_cmd(bucket_name, "testnx") == 0
-    assert trwm.storage_create_cmd("!invalid", "testnx") == 1
-    assert trwm.storage_create_cmd(bucket_name, "") == 1
+    assert trwm.storage_create(bucket_name, "testnx") == 0
+    assert trwm.storage_create("!invalid", "testnx") == 1
+    assert trwm.storage_create(bucket_name, "") == 1
 
 
-def test_storage_delete_cmd(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
-    """test_storage_create_cmd"""
+def test_storage_delete(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+    """test_storage_delete"""
 
     trwm = rwm.RWM({
         "rwm_s3_endpoint_url": radosuser_admin.url,
@@ -260,44 +260,44 @@ def test_storage_delete_cmd(tmpworkdir: str, microceph: str, radosuser_admin: rw
     bucket = trwm.storage_manager.storage_create(bucket_name, "admin")
     assert len(trwm.storage_manager.list_objects(bucket_name)) == 0
     assert trwm.restic_cmd(["init"]).returncode == 0
-    assert trwm.backup_cmd("testcfg").returncode == 0
+    assert trwm.backup("testcfg").returncode == 0
     assert len(trwm.storage_manager.list_objects(bucket_name)) != 0
 
     object_versions = radosuser_admin.s3.meta.client.list_object_versions(Bucket=bucket.name)
     assert len(object_versions["Versions"]) > 0
     assert len(object_versions["DeleteMarkers"]) > 0
 
-    assert trwm.storage_delete_cmd(bucket_name) == 0
+    assert trwm.storage_delete(bucket_name) == 0
     assert not trwm.storage_manager.bucket_exist(bucket_name)
 
-    assert trwm.storage_delete_cmd(bucket_name) == 1
+    assert trwm.storage_delete(bucket_name) == 1
 
 
-def test_storage_check_policy_cmd(tmpworkdir: str):  # pylint: disable=unused-argument
-    """test storage check policy command"""
+def test_storage_check_policy(tmpworkdir: str):  # pylint: disable=unused-argument
+    """test storage check policy"""
 
     trwm = rwm.RWM({})
 
     mock = Mock(return_value=False)
     with patch.object(rwm.StorageManager, "storage_check_policy", mock):
-        assert trwm.storage_check_policy_cmd("dummy") == 1
+        assert trwm.storage_check_policy("dummy") == 1
 
 
-def test_storage_list_cmd(tmpworkdir: str):  # pylint: disable=unused-argument
-    """test storage check policy command"""
+def test_storage_list(tmpworkdir: str):  # pylint: disable=unused-argument
+    """test storage_list"""
 
     trwm = rwm.RWM({})
 
     mock = Mock(return_value=[])
     with patch.object(rwm.StorageManager, "storage_list", mock):
-        assert trwm.storage_list_cmd() == 0
+        assert trwm.storage_list() == 0
 
 
-def test_storage_drop_versions_cmd(tmpworkdir: str):  # pylint: disable=unused-argument
-    """test storage drop versions command"""
+def test_storage_drop_versions(tmpworkdir: str):  # pylint: disable=unused-argument
+    """test storage drop versions"""
 
     trwm = rwm.RWM({})
 
     mock = Mock(return_value=0)
     with patch.object(rwm.StorageManager, "storage_drop_versions", mock):
-        assert trwm.storage_drop_versions_cmd("dummy") == 0
+        assert trwm.storage_drop_versions("dummy") == 0

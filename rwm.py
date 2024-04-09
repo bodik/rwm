@@ -385,7 +385,7 @@ class RWM:
 
         return self.restic_cmd(cmd_args)
 
-    def backup_cmd(self, name) -> subprocess.CompletedProcess:
+    def backup(self, name) -> subprocess.CompletedProcess:
         """backup command"""
 
         if not self.storage_manager.storage_check_policy(self.config["rwm_restic_bucket"]):
@@ -403,7 +403,7 @@ class RWM:
 
         return backup_proc
 
-    def backup_all_cmd(self) -> int:
+    def backup_all(self) -> int:
         """backup all command"""
 
         stats = {}
@@ -427,7 +427,7 @@ class RWM:
         print(tabulate([item.to_dict() for item in stats.values()], headers="keys", numalign="left"))
         return ret
 
-    def storage_create_cmd(self, bucket_name, target_username) -> int:
+    def storage_create(self, bucket_name, target_username) -> int:
         """storage create command"""
 
         try:
@@ -441,7 +441,7 @@ class RWM:
             return 1
         return 0
 
-    def storage_delete_cmd(self, bucket_name) -> int:
+    def storage_delete(self, bucket_name) -> int:
         """storage delete command"""
 
         try:
@@ -451,7 +451,7 @@ class RWM:
             return 1
         return 0
 
-    def storage_check_policy_cmd(self, bucket_name) -> int:
+    def storage_check_policy(self, bucket_name) -> int:
         """storage check policy command"""
 
         ret, msg = (0, "OK") if self.storage_manager.storage_check_policy(bucket_name) else (1, "FAILED")
@@ -459,7 +459,7 @@ class RWM:
         print(msg)
         return ret
 
-    def storage_list_cmd(self):
+    def storage_list(self) -> int:
         """storage_list command"""
 
         print(tabulate(
@@ -469,7 +469,7 @@ class RWM:
         ))
         return 0
 
-    def storage_drop_versions_cmd(self, bucket_name):
+    def storage_drop_versions(self, bucket_name):
         """storage_drop_versions command"""
 
         return self.storage_manager.storage_drop_versions(bucket_name)
@@ -563,22 +563,22 @@ def main(argv=None):  # pylint: disable=too-many-branches
         ret = wrap_output(rwmi.restic_cmd(args.cmd_args))
 
     if args.command == "backup":
-        ret = rwmi.backup_cmd(args.name).returncode
+        ret = rwmi.backup(args.name).returncode
         logger.info("rwm backup finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     if args.command == "backup_all":
-        ret = rwmi.backup_all_cmd()
+        ret = rwmi.backup_all()
         logger.info("rwm backup_all finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
 
     if args.command == "storage_create":
-        ret = rwmi.storage_create_cmd(args.bucket_name, args.target_username)
+        ret = rwmi.storage_create(args.bucket_name, args.target_username)
     if args.command == "storage_delete":
-        ret = rwmi.storage_delete_cmd(args.bucket_name)
+        ret = rwmi.storage_delete(args.bucket_name)
     if args.command == "storage_check_policy":
-        ret = rwmi.storage_check_policy_cmd(args.bucket_name)
+        ret = rwmi.storage_check_policy(args.bucket_name)
     if args.command == "storage_list":
-        ret = rwmi.storage_list_cmd()
+        ret = rwmi.storage_list()
     if args.command == "storage_drop_versions":
-        ret = rwmi.storage_drop_versions_cmd(args.bucket_name)
+        ret = rwmi.storage_drop_versions(args.bucket_name)
 
     logger.debug("rwm finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     return ret

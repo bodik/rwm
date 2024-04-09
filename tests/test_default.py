@@ -43,18 +43,18 @@ def test_main(tmpworkdir: str):  # pylint: disable=unused-argument
     with patch.object(rwm.RWM, "restic_cmd", mock_proc):
         assert rwm_main(["restic", "dummy"]) == 0
 
-    with patch.object(rwm.RWM, "backup_cmd", mock_proc):
+    with patch.object(rwm.RWM, "backup", mock_proc):
         assert rwm_main(["backup", "dummy"]) == 0
-    with patch.object(rwm.RWM, "backup_all_cmd", mock_ok):
+    with patch.object(rwm.RWM, "backup_all", mock_ok):
         assert rwm_main(["backup_all"]) == 0
 
-    with patch.object(rwm.RWM, "storage_create_cmd", mock_ok):
+    with patch.object(rwm.RWM, "storage_create", mock_ok):
         assert rwm_main(["storage_create", "bucket", "user"]) == 0
-    with patch.object(rwm.RWM, "storage_delete_cmd", mock_ok):
+    with patch.object(rwm.RWM, "storage_delete", mock_ok):
         assert rwm_main(["storage_delete", "bucket"]) == 0
-    with patch.object(rwm.RWM, "storage_check_policy_cmd", mock_ok):
+    with patch.object(rwm.RWM, "storage_check_policy", mock_ok):
         assert rwm_main(["storage_check_policy", "bucket"]) == 0
-    with patch.object(rwm.RWM, "storage_list_cmd", mock_ok):
+    with patch.object(rwm.RWM, "storage_list", mock_ok):
         assert rwm_main(["storage_list"]) == 0
-    with patch.object(rwm.RWM, "storage_drop_versions_cmd", mock_ok):
+    with patch.object(rwm.RWM, "storage_drop_versions", mock_ok):
         assert rwm_main(["storage_drop_versions", "bucket"]) == 0
