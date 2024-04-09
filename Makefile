@@ -37,12 +37,13 @@ microceph-service:
 	/snap/bin/microceph enable rgw
 	while true; do /snap/bin/ceph status | grep "HEALTH_OK" && break; done
 	# required for gitlab runner shell executor which runs as non-privileged user
-	ln -sf /var/snap/microceph/current/conf /etc/ceph
+	cp -arL /var/snap/microceph/current/conf /etc/ceph
+	chmod 644 /var/snap/microceph/current/conf/*
 	chmod 644 /etc/ceph/*
 
 microceph-cleanup:
 	snap remove microceph --purge
-	rm /etc/ceph
+	rm -rf /etc/ceph
 
 microceph: microceph-cleanup microceph-service
 
