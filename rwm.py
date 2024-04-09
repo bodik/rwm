@@ -260,17 +260,24 @@ class StorageManager:
         """deletes all old versions and delete markers from storage to reclaim space"""
 
         # ? lock repo
+        paginator = self.s3.meta.client.get_paginator('list_object_versions')
 
         # drop all active object versions
-        object_versions = self.s3.meta.client.list_object_versions(Bucket=bucket_name)
-        for item in object_versions["Versions"]:
-            if not item["IsLatest"]:
-                self.s3.ObjectVersion(bucket_name, item["Key"], item["VersionId"]).delete()
+        objects = []
+        for page in paginator.paginate(Bucket=bucket_name):
+            for item in page.get("Versions", []):
+                if not item["IsLatest"]:
+                    objects.append([bucket_name, item["Key"], item["VersionId"]])
+        for item in objects:
+            self.s3.ObjectVersion(*item).delete()
 
         # drop all delete markers
-        object_versions = self.s3.meta.client.list_object_versions(Bucket=bucket_name)
-        for item in object_versions["DeleteMarkers"]:
-            self.s3.ObjectVersion(bucket_name, item["Key"], item["VersionId"]).delete()
+        objects = []
+        for page in paginator.paginate(Bucket=bucket_name):
+            for item in page.get("DeleteMarkers", []):
+                objects.append([bucket_name, item["Key"], item["VersionId"]])
+        for item in objects:
+            self.s3.ObjectVersion(*item).delete()
 
         return 0
 

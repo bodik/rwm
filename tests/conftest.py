@@ -59,7 +59,7 @@ def radosuser(microceph_url, username, tenant="tenant1"):
     """rgwuser fixture"""
 
     subprocess.run(
-        ["/snap/bin/radosgw-admin", "user", "rm", f"--uid={tenant}${username}", "--purge-data"],
+        ["/snap/bin/radosgw-admin", "user", "rm", f"--uid={tenant}${username}", "--purge-data", "--purge-keys"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False
@@ -74,7 +74,7 @@ def radosuser(microceph_url, username, tenant="tenant1"):
     user = json.loads(proc.stdout)
     yield StorageManager(microceph_url, user["keys"][0]["access_key"], user["keys"][0]["secret_key"])
 
-    subprocess.run(["/snap/bin/radosgw-admin", "user", "rm", f"--uid={tenant}${username}", "--purge-data"], check=True)
+    subprocess.run(["/snap/bin/radosgw-admin", "user", "rm", f"--uid={tenant}${username}", "--purge-data", "--purge-keys"], check=True)
 
 
 @pytest.fixture
