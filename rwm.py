@@ -6,6 +6,7 @@ import dataclasses
 import json
 import logging
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -235,22 +236,35 @@ class StorageManager:
 
         return False
 
-    def storage_list(self):
+    def storage_list(self, show_full=False, name_filter=""):
         """storage list"""
 
+        pattern = re.compile(name_filter)
+        buckets = [bucket for bucket in self.list_buckets() if pattern.search(bucket.name)]
+        paginator = self.s3.meta.client.get_paginator('list_object_versions')
         output = []
-        for item in self.list_buckets():
+
+        for bucket in buckets:
             result = {
-                "name": item.name,
-                "policy": "OK" if self.storage_check_policy(item.name) else "FAILED",
-                "owner": self.bucket_owner(item.name).split("$")[-1]
+                "name": bucket.name,
+                "policy": "OK" if self.storage_check_policy(bucket.name) else "FAILED",
+                "owner": self.bucket_owner(bucket.name).split("$")[-1]
             }
 
             if result["policy"] == "OK":
-                user_statement = self._policy_statements_user(self.bucket_policy(item.name))[0]
+                user_statement = self._policy_statements_user(self.bucket_policy(bucket.name))[0]
                 result["target_user"] = user_statement["Principal"]["AWS"][0].split("/")[-1]
             else:
                 result["target_user"] = None
+
+            if show_full:
+                result["objects"] = 0
+                result["old_versions"] = 0
+                result["delete_markers"] = 0
+                for page in paginator.paginate(Bucket=bucket.name):
+                    for obj in page.get("Versions", []):
+                        result["objects" if obj["IsLatest"] else "old_versions"] += 1
+                    result["delete_markers"] += len(page.get("DeleteMarkers", []))
 
             output.append(result)
 
@@ -459,11 +473,11 @@ class RWM:
         print(msg)
         return ret
 
-    def storage_list(self) -> int:
+    def storage_list(self, show_full=False, name_filter="") -> int:
         """storage_list command"""
 
         print(tabulate(
-            self.storage_manager.storage_list(),
+            self.storage_manager.storage_list(show_full, name_filter),
             headers="keys",
             numalign="left"
         ))
@@ -524,7 +538,9 @@ def parse_arguments(argv):
     storage_check_policy_cmd_parser = subparsers.add_parser("storage_check_policy", help="check bucket policies; use --debug to show policy")
     storage_check_policy_cmd_parser.add_argument("bucket_name", help="bucket name")
 
-    _ = subparsers.add_parser("storage_list", help="list storages")
+    storage_list_cmd_parser = subparsers.add_parser("storage_list", help="list storages")
+    storage_list_cmd_parser.add_argument("--full", action="store_true", help="show object counts")
+    storage_list_cmd_parser.add_argument("--filter", default="", help="name filter regex")
 
     storage_drop_versions_cmd_parser = subparsers.add_parser(
         "storage_drop_versions",
@@ -576,7 +592,7 @@ def main(argv=None):  # pylint: disable=too-many-branches
     if args.command == "storage_check_policy":
         ret = rwmi.storage_check_policy(args.bucket_name)
     if args.command == "storage_list":
-        ret = rwmi.storage_list()
+        ret = rwmi.storage_list(args.full, args.filter)
     if args.command == "storage_drop_versions":
         ret = rwmi.storage_drop_versions(args.bucket_name)
 
