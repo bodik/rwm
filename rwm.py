@@ -2,6 +2,7 @@
 """rwm, restic/s3 worm manager"""
 
 import dataclasses
+import gzip
 import json
 import logging
 import os
@@ -11,6 +12,7 @@ import subprocess
 import sys
 from argparse import ArgumentParser
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 
 import boto3
@@ -85,6 +87,15 @@ class BackupResult:
         }
 
 
+class RwmJSONEncoder(json.JSONEncoder):
+    """json encoder"""
+
+    def default(self, o):
+        if isinstance(o, datetime):
+            return o.isoformat()
+        return super().default(o)  # pragma: nocover  ; no other type in processeda data
+
+
 class StorageManager:
     """s3 policed bucket manager"""
 
@@ -94,7 +105,8 @@ class StorageManager:
         "s3:GetObject",
         "s3:PutObject",
         "s3:DeleteObject",
-        # check policies
+        # policies
+        "s3:GetBucketAcl",
         "s3:GetBucketPolicy",
         "s3:ListBucketVersions",
         "s3:GetBucketVersioning"
@@ -277,6 +289,44 @@ class StorageManager:
 
         return 0
 
+    def _bucket_state(self, bucket_name):
+        """dumps current bucket state into dict"""
+
+        acl = self.s3.Bucket(bucket_name).Acl()
+        state = {
+            "bucket_name": bucket_name,
+            "bucket_acl": {"owner": acl.owner, "grants": acl.grants},
+            "bucket_policy": self.bucket_policy(bucket_name),
+            "time_start": datetime.now(),
+            "time_end": None,
+            "versions": [],
+            "delete_markers": []
+        }
+
+        paginator = self.s3.meta.client.get_paginator('list_object_versions')
+        for page in paginator.paginate(Bucket=bucket_name):
+            state["versions"] += page.get("Versions", [])
+            state["delete_markers"] += page.get("DeleteMarkers", [])
+        state["time_end"] = datetime.now()
+
+        return state
+
+    def storage_save_state(self, bucket_name):
+        """save storage state into itself"""
+
+        try:
+            bucket_state = self._bucket_state(bucket_name)
+            now = datetime.now().astimezone().isoformat()
+            self.s3.Bucket(bucket_name).upload_fileobj(
+                BytesIO(gzip.compress(json.dumps(bucket_state, cls=RwmJSONEncoder).encode())),
+                f"rwm/state_{now}.json.gz"
+            )
+        except (BotoCoreError, ClientError, TypeError) as exc:
+            logger.exception(exc)
+            return 1
+
+        return 0
+
 
 class RWM:
     """rwm impl"""
@@ -345,7 +395,9 @@ class RWM:
     def backup(self, name) -> int:
         """backup command"""
 
-        if not self.storage_manager.storage_check_policy(self.config["rwm_restic_bucket"]):
+        bucket_name = self.config["rwm_restic_bucket"]
+
+        if not self.storage_manager.storage_check_policy(bucket_name):
             logger.warning("used bucket does not have expected policy")
 
         wrap_output(backup_proc := self._restic_backup(name))
@@ -358,12 +410,16 @@ class RWM:
             logger.error("rwm _restic_forget_prune failed")
             return 1
 
+        if self.storage_manager.storage_save_state(bucket_name) != 0:
+            logger.error("rwm storage_save_state failed")
+            return 1
+
         return 0
 
     def backup_all(self) -> int:
         """backup all command"""
 
-        stats = {}
+        stats = []
         ret = 0
 
         for name in self.config["rwm_backups"].keys():
@@ -371,17 +427,23 @@ class RWM:
             wrap_output(backup_proc := self._restic_backup(name))
             time_end = datetime.now()
             ret |= backup_proc.returncode
-            stats[name] = BackupResult(name, backup_proc.returncode, time_start, time_end)
+            stats.append(BackupResult(name, backup_proc.returncode, time_start, time_end))
 
         if ret == 0:
             time_start = datetime.now()
             wrap_output(forget_proc := self._restic_forget_prune())
             time_end = datetime.now()
             ret |= forget_proc.returncode
-            stats["_forget_prune"] = BackupResult("_forget_prune", forget_proc.returncode, time_start, time_end)
+            stats.append(BackupResult("_forget_prune", forget_proc.returncode, time_start, time_end))
+
+        time_start = datetime.now()
+        save_state_ret = self.storage_manager.storage_save_state(self.config["rwm_restic_bucket"])
+        time_end = datetime.now()
+        ret |= save_state_ret
+        stats.append(BackupResult("_storage_save_state", save_state_ret, time_start, time_end))
 
         logger.info("rwm backup_all results")
-        print(tabulate([item.to_dict() for item in stats.values()], headers="keys", numalign="left"))
+        print(tabulate([item.to_dict() for item in stats], headers="keys", numalign="left"))
         return ret
 
     def storage_create(self, bucket_name, target_username) -> int:
@@ -479,7 +541,7 @@ def parse_arguments(argv):
 
     storage_drop_versions_cmd_parser = subparsers.add_parser(
         "storage_drop_versions",
-        help="reclaim storage space; drops any old object versions from bucket"
+        help="reclaim storage space; drop any old object versions from bucket"
     )
     storage_drop_versions_cmd_parser.add_argument("bucket_name", help="bucket name")
 

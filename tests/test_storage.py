@@ -4,6 +4,7 @@ import json
 import os
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -206,3 +207,11 @@ def test_storage_drop_versions_many(tmpworkdir: str, microceph: str, radosuser_a
 
     object_versions = list(bucket.object_versions.all())
     assert len(object_versions) == 1
+
+
+def test_storage_save_state_error_handling(tmpworkdir: str):  # pylint: disable=unused-argument
+    """test storage_save_state error handling"""
+
+    mock = Mock(side_effect=TypeError("dummy"))
+    with patch.object(rwm.StorageManager, "_bucket_state", mock):
+        assert rwm.StorageManager("http://localhost", "", "").storage_save_state("dummy") == 1
