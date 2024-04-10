@@ -36,10 +36,6 @@ def test_main(tmpworkdir: str):  # pylint: disable=unused-argument
 
     with patch.object(rwm.RWM, "aws_cmd", mock_proc):
         assert rwm_main(["aws", "dummy"]) == 0
-    with patch.object(rwm.RWM, "rclone_cmd", mock_proc):
-        assert rwm_main(["rclone", "dummy"]) == 0
-    with patch.object(rwm.RWM, "rclone_crypt_cmd", mock_proc):
-        assert rwm_main(["rclone_crypt", "dummy"]) == 0
     with patch.object(rwm.RWM, "restic_cmd", mock_proc):
         assert rwm_main(["restic", "dummy"]) == 0
 

@@ -27,57 +27,6 @@ def test_aws_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-ar
     assert not trwm.storage_manager.bucket_exist(test_bucket)
 
 
-def test_rclone_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
-    """test rclone command"""
-
-    trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": motoserver,
-        "rwm_s3_access_key": "dummy",
-        "rwm_s3_secret_key": "dummy",
-    })
-
-    test_bucket = "testbucket"
-    test_file = "testfile.txt"
-    Path(test_file).write_text('1234', encoding='utf-8')
-
-    trwm.rclone_cmd(["mkdir", f"rwmbe:/{test_bucket}/"])
-    assert trwm.storage_manager.bucket_exist(test_bucket)
-
-    trwm.rclone_cmd(["copy", test_file, f"rwmbe:/{test_bucket}/"])
-    assert len(trwm.storage_manager.list_objects(test_bucket)) == 1
-
-
-def test_rclone_crypt_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
-    """test rclone with crypt overlay"""
-
-    trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": motoserver,
-        "rwm_s3_access_key": "dummy",
-        "rwm_s3_secret_key": "dummy",
-        "rwm_rclone_crypt_bucket": "cryptdata_test",
-        "rwm_rclone_crypt_password": rwm.rclone_obscure_password("dummydummydummydummy"),
-    })
-
-    test_bucket = "testbucket"
-    test_file = "testfile.txt"
-    Path(test_file).write_text('1234', encoding='utf-8')
-
-    trwm.rclone_crypt_cmd(["copy", test_file, f"rwmbe:/{test_bucket}/"])
-    assert len(trwm.storage_manager.list_objects(trwm.config["rwm_rclone_crypt_bucket"])) == 1
-
-    trwm.rclone_crypt_cmd(["delete", f"rwmbe:/{test_bucket}/{test_file}"])
-    assert len(trwm.storage_manager.list_objects(trwm.config["rwm_rclone_crypt_bucket"])) == 0
-
-    test_file1 = "testfile1.txt"
-    Path(test_file1).write_text('4321', encoding='utf-8')
-    trwm.rclone_crypt_cmd(["sync", ".", f"rwmbe:/{test_bucket}/"])
-    assert len(trwm.storage_manager.list_objects(trwm.config["rwm_rclone_crypt_bucket"])) == 2
-
-    Path(test_file1).unlink()
-    trwm.rclone_crypt_cmd(["sync", ".", f"rwmbe:/{test_bucket}/"])
-    assert len(trwm.storage_manager.list_objects(trwm.config["rwm_rclone_crypt_bucket"])) == 1
-
-
 def test_restic_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
     """test restic command"""
 

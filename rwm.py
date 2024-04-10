@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """rwm, restic/s3 worm manager"""
 
-import base64
 import dataclasses
 import json
 import logging
@@ -17,8 +16,6 @@ from pathlib import Path
 import boto3
 import botocore
 import yaml
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
 from tabulate import tabulate
 
 
@@ -64,21 +61,6 @@ def wrap_output(process):
     if process.stderr:
         print(process.stderr, file=sys.stderr)
     return process.returncode
-
-
-def rclone_obscure_password(plaintext, iv=None):
-    """rclone obscure password algorithm"""
-
-    # https://github.com/rclone/rclone/blob/master/fs/config/obscure/obscure.go
-    # https://github.com/maaaaz/rclonedeobscure
-    # GTP translate to python cryptography
-
-    secret_key = b"\x9c\x93\x5b\x48\x73\x0a\x55\x4d\x6b\xfd\x7c\x63\xc8\x86\xa9\x2b\xd3\x90\x19\x8e\xb8\x12\x8a\xfb\xf4\xde\x16\x2b\x8b\x95\xf6\x38"
-    if not iv:
-        iv = os.urandom(16)
-    encryptor = Cipher(algorithms.AES(secret_key), modes.CTR(iv), backend=default_backend()).encryptor()
-    data = iv + encryptor.update(plaintext.encode()) + encryptor.finalize()
-    return base64.urlsafe_b64encode(data).decode().rstrip("=")
 
 
 @dataclasses.dataclass
@@ -323,45 +305,6 @@ class RWM:
         # aws cli does not have endpoint-url as env config option
         return run_command(["aws", "--endpoint-url", self.config["rwm_s3_endpoint_url"]] + args, env=env)
 
-    def rclone_cmd(self, args) -> subprocess.CompletedProcess:
-        """rclone wrapper"""
-
-        env = {
-            "RCLONE_CONFIG": "",
-            "RCLONE_CONFIG_RWMBE_TYPE": "s3",
-            "RCLONE_CONFIG_RWMBE_ENDPOINT": self.config["rwm_s3_endpoint_url"],
-            "RCLONE_CONFIG_RWMBE_ACCESS_KEY_ID": self.config["rwm_s3_access_key"],
-            "RCLONE_CONFIG_RWMBE_SECRET_ACCESS_KEY": self.config["rwm_s3_secret_key"],
-            "RCLONE_CONFIG_RWMBE_PROVIDER": "Ceph",
-            "RCLONE_CONFIG_RWMBE_ENV_AUTH": "false",
-            "RCLONE_CONFIG_RWMBE_REGION": "",
-        }
-        return run_command(["rclone"] + args, env=env)
-
-    def rclone_crypt_cmd(self, args) -> subprocess.CompletedProcess:
-        """
-        rclone crypt wrapper
-        * https://rclone.org/docs/#config-file
-        * https://rclone.org/crypt/
-        """
-
-        env = {
-            "RCLONE_CONFIG": "",
-            "RCLONE_CONFIG_RWMBE_TYPE": "crypt",
-            "RCLONE_CONFIG_RWMBE_REMOTE": f"rwmbes3:/{self.config['rwm_rclone_crypt_bucket']}",
-            "RCLONE_CONFIG_RWMBE_PASSWORD": rclone_obscure_password(self.config["rwm_rclone_crypt_password"]),
-            "RCLONE_CONFIG_RWMBE_PASSWORD2": rclone_obscure_password(self.config["rwm_rclone_crypt_password"]),
-
-            "RCLONE_CONFIG_RWMBES3_TYPE": "s3",
-            "RCLONE_CONFIG_RWMBES3_ENDPOINT": self.config["rwm_s3_endpoint_url"],
-            "RCLONE_CONFIG_RWMBES3_ACCESS_KEY_ID": self.config["rwm_s3_access_key"],
-            "RCLONE_CONFIG_RWMBES3_SECRET_ACCESS_KEY": self.config["rwm_s3_secret_key"],
-            "RCLONE_CONFIG_RWMBES3_PROVIDER": "Ceph",
-            "RCLONE_CONFIG_RWMBES3_ENV_AUTH": "false",
-            "RCLONE_CONFIG_RWMBES3_REGION": "",
-        }
-        return run_command(["rclone"] + args, env=env)
-
     def restic_cmd(self, args) -> subprocess.CompletedProcess:
         """restic command wrapper"""
 
@@ -516,10 +459,6 @@ def parse_arguments(argv):
 
     aws_cmd_parser = subparsers.add_parser("aws", help="run aws cli")
     aws_cmd_parser.add_argument("cmd_args", nargs="*")
-    rclone_cmd_parser = subparsers.add_parser("rclone", help="run rclone")
-    rclone_cmd_parser.add_argument("cmd_args", nargs="*")
-    rclone_crypt_cmd_parser = subparsers.add_parser("rclone_crypt", help="run rclone with crypt overlay")
-    rclone_crypt_cmd_parser.add_argument("cmd_args", nargs="*")
     restic_cmd_parser = subparsers.add_parser("restic", help="run restic")
     restic_cmd_parser.add_argument("cmd_args", nargs="*")
 
@@ -571,10 +510,6 @@ def main(argv=None):  # pylint: disable=too-many-branches
 
     if args.command == "aws":
         ret = wrap_output(rwmi.aws_cmd(args.cmd_args))
-    if args.command == "rclone":
-        ret = wrap_output(rwmi.rclone_cmd(args.cmd_args))
-    if args.command == "rclone_crypt":
-        ret = wrap_output(rwmi.rclone_crypt_cmd(args.cmd_args))
     if args.command == "restic":
         ret = wrap_output(rwmi.restic_cmd(args.cmd_args))
 

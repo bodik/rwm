@@ -1,5 +1,4 @@
 # runtime
-cryptography
 tabulate
 
 # dev

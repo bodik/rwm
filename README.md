@@ -29,8 +29,7 @@ credentials for the managed bucket.
 
 ## Features
 
-* low-level S3 access for aws cli and rclone
-* rclone "crypt over S3" backend
+* low-level S3 access for aws cli
 * restic with S3 repository
 * simple backup manager/executor
 * storage manager
@@ -43,11 +42,14 @@ TODO:
 * recreate bucket contents on local filesystem (or remote bucket) acording to specified
   state data
 * ??? check completeness of the current state of the bucket
-* unlike in other backup solutions, attacker with credentials can restore
-  old data from the repository/bucket, this should be discussed (howto threat modeling ?)
-* rgw leaks objects on tests
 
-* drop rclone use-cases
+
+## Known issues
+
+* During tests RGW is suspected to leak RADOS objects
+
+* Unlike in other backup solutions, attacker with credentials can restore
+  old data from the repository/bucket, this should be discussed (howto threat modeling ?)
 
 
 ## Usage
@@ -103,21 +105,11 @@ rwm --confg admin.conf storage_drop_versions bucket1
 #### AWS cli
 
 ```
-cp examples/rwm-rclone.conf rwm.conf
+cp examples/rwm-restic.conf rwm.conf
 rwm aws s3 ls s3://
 rwm aws s3api list-buckets
-rwm rclone lsd rwmbe:/
 ```
 
-#### rclone with crypt overlay
-
-rclone_crypt defines single default remote named "rwmbe:/" pointed to `rwm_rclone_crypt_bucket` path.
-
-```
-cp examples/rwm-rclone.conf rwm.conf
-rwm rclone_crypt sync /data rwmbe:/
-rwm rclone_crypt lsl rwmbe:/
-```
 
 #### Restic: manual restic backup
 
@@ -133,7 +125,7 @@ rwm restic mount /mnt/restore
 ## Notes
 
 * executed tools stdout is buffered, eg. `restic mount` does not print immediate output as normal
-* passthrough full arguments to underlying tool with "--" (eg. `rwm rclone -- ls --help`).
+* passthrough full arguments to underlying tool with "--" (eg. `rwm aws -- s3api --help`).
 * runner microceph breaks on reboot because of symlink at /etc/ceph
 
 
