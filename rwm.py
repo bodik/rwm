@@ -14,8 +14,8 @@ from datetime import datetime
 from pathlib import Path
 
 import boto3
-import botocore
 import yaml
+from botocore.exceptions import BotoCoreError, ClientError
 from tabulate import tabulate
 
 
@@ -125,7 +125,7 @@ class StorageManager:
 
         try:
             return json.loads(self.s3.Bucket(name).Policy().policy)
-        except (botocore.exceptions.ClientError, botocore.exceptions.BotoCoreError) as exc:
+        except (ClientError, BotoCoreError) as exc:
             if "NoSuchBucketPolicy" not in str(exc):
                 logger.error("rwm bucket_policy error, %s", (exc))
             return None
@@ -389,11 +389,7 @@ class RWM:
 
         try:
             self.storage_manager.storage_create(bucket_name, target_username)
-        except (
-            botocore.exceptions.ClientError,
-            botocore.exceptions.BotoCoreError,
-            ValueError
-        ) as exc:
+        except (ClientError, BotoCoreError, ValueError) as exc:
             logger.error("rwm storage_create error, %s", (exc))
             return 1
         return 0
@@ -403,7 +399,7 @@ class RWM:
 
         try:
             self.storage_manager.storage_delete(bucket_name)
-        except (botocore.exceptions.ClientError, botocore.exceptions.BotoCoreError) as exc:
+        except (ClientError, BotoCoreError) as exc:
             logger.error("rwm storage_delete error, %s", (exc))
             return 1
         return 0
