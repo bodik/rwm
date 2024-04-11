@@ -6,7 +6,6 @@ import gzip
 import json
 import logging
 import os
-import re
 import shlex
 import subprocess
 import sys
@@ -152,6 +151,11 @@ class StorageManager:
                 logger.error("rwm bucket_policy error, %s", (exc))
             return None
 
+    def bucket_acl(self, name):
+        """api stub"""
+        acl = self.s3.Bucket(name).Acl()
+        return {"owner": acl.owner, "grants": acl.grants}
+
     def list_buckets(self):
         """aws s3 resource api stub"""
         return list(self.s3.buckets.all())
@@ -240,19 +244,15 @@ class StorageManager:
 
         return False
 
-    def storage_list(self, show_full=False, name_filter=""):
+    def storage_list(self):
         """storage list"""
 
-        pattern = re.compile(name_filter)
-        buckets = [bucket for bucket in self.list_buckets() if pattern.search(bucket.name)]
-        paginator = self.s3.meta.client.get_paginator('list_object_versions')
         output = []
-
-        for bucket in buckets:
+        for bucket in self.list_buckets():
             result = {}
             result["name"] = bucket.name
             result["policy"] = "OK" if self.storage_check_policy(bucket.name) else "FAILED"
-            result["owner"] = self.bucket_owner(bucket.name).split("$")[-1]
+            result["short_owner"] = self.bucket_owner(bucket.name).split("$")[-1]
 
             if result["policy"] == "OK":
                 user_statement = self._policy_statements_user(self.bucket_policy(bucket.name))[0]
@@ -260,28 +260,41 @@ class StorageManager:
             else:
                 result["target_user"] = None
 
-            if show_full:
-                result["objects"] = 0
-                result["delete_markers"] = 0
-                result["old_versions"] = 0
-                result["size"] = 0
-                result["old_size"] = 0
-
-                for page in paginator.paginate(Bucket=bucket.name):
-                    for obj in page.get("Versions", []):
-                        if obj["IsLatest"]:
-                            result["objects"] += 1
-                            result["size"] += obj["Size"]
-                        else:
-                            result["old_versions"] += 1
-                            result["old_size"] += obj["Size"]
-                    result["delete_markers"] += len(page.get("DeleteMarkers", []))
-                result["size"] = size_fmt(result["size"])
-                result["old_size"] = size_fmt(result["old_size"])
-
             output.append(result)
 
         return output
+
+    def storage_info(self, bucket_name):
+        """grabs storage bucket detailed info"""
+
+        result = {}
+        result["name"] = bucket_name
+        result["check_policy"] = "OK" if self.storage_check_policy(bucket_name) else "FAILED"
+        result["owner"] = self.bucket_owner(bucket_name)
+        result["acl"] = self.bucket_acl(bucket_name)
+        result["policy"] = self.bucket_policy(bucket_name)
+        result["objects"] = 0
+        result["delete_markers"] = 0
+        result["old_versions"] = 0
+        result["size"] = 0
+        result["old_size"] = 0
+        result["saved_states"] = []
+
+        paginator = self.s3.meta.client.get_paginator('list_object_versions')
+        for page in paginator.paginate(Bucket=bucket_name):
+            for obj in page.get("Versions", []):
+                if obj["IsLatest"]:
+                    result["objects"] += 1
+                    result["size"] += obj["Size"]
+                else:
+                    result["old_versions"] += 1
+                    result["old_size"] += obj["Size"]
+            result["delete_markers"] += len(page.get("DeleteMarkers", []))
+
+        for page in paginator.paginate(Bucket=bucket_name, Prefix="rwm"):
+            result["saved_states"] += [x["Key"] for x in page.get("Versions", [])]
+
+        return result
 
     def storage_drop_versions(self, bucket_name):
         """deletes all old versions and delete markers from storage to reclaim space"""
@@ -311,10 +324,9 @@ class StorageManager:
     def _bucket_state(self, bucket_name):
         """dumps current bucket state into dict"""
 
-        acl = self.s3.Bucket(bucket_name).Acl()
         state = {
             "bucket_name": bucket_name,
-            "bucket_acl": {"owner": acl.owner, "grants": acl.grants},
+            "bucket_acl": self.bucket_acl(bucket_name),
             "bucket_policy": self.bucket_policy(bucket_name),
             "time_start": datetime.now(),
             "time_end": None,
@@ -490,22 +502,46 @@ class RWM:
 
         return self.storage_manager.storage_delete(bucket_name)
 
-    def storage_list(self, show_full=False, name_filter="") -> int:
+    def storage_list(self) -> int:
         """storage_list command"""
 
-        print(tabulate(
-            self.storage_manager.storage_list(show_full, name_filter),
-            headers="keys",
-            numalign="left"
-        ))
+        print(tabulate(self.storage_manager.storage_list(), headers="keys", numalign="left"))
         return 0
 
-    def storage_drop_versions(self, bucket_name):
+    def storage_info(self, bucket_name) -> int:
+        """storage_list command"""
+
+        sinfo = self.storage_manager.storage_info(bucket_name)
+        total_size = sinfo["size"] + sinfo["old_size"]
+
+        print(f'Storage bucket:   {sinfo["name"]}')
+        print("----------------------------------------")
+        print(f'RWM policy check: {sinfo["check_policy"]}')
+        print(f'Owner:            {sinfo["owner"]}')
+        print(f'Objects:          {sinfo["objects"]}')
+        print(f'Delete markers:   {sinfo["delete_markers"]}')
+        print(f'Old versions:     {sinfo["old_versions"]}')
+        print(f'Size:             {size_fmt(sinfo["size"])}')
+        print(f'Old size:         {size_fmt(sinfo["old_size"])}')
+        print(f'Total size:       {size_fmt(total_size)}')
+        print("----------------------------------------")
+        print("Bucket ACL:")
+        print(json.dumps(sinfo["acl"], indent=2))
+        print("----------------------------------------")
+        print("Bucket policy:")
+        print(json.dumps(sinfo["policy"], indent=2))
+        print("----------------------------------------")
+        print("RWM saved states:")
+        print("\n".join(sorted(sinfo["saved_states"])))
+
+        return 0
+
+    def storage_drop_versions(self, bucket_name) -> int:
         """storage_drop_versions command"""
 
         return self.storage_manager.storage_drop_versions(bucket_name)
 
-    def storage_restore_state(self, source_bucket, target_bucket, state_object_key):
+    def storage_restore_state(self, source_bucket, target_bucket, state_object_key) -> int:
         """storage restore state"""
 
         return self.storage_manager.storage_restore_state(source_bucket, target_bucket, state_object_key)
@@ -553,9 +589,10 @@ def parse_arguments(argv):
     storage_delete_cmd_parser = subparsers.add_parser("storage_delete", help="delete storage")
     storage_delete_cmd_parser.add_argument("bucket_name", help="bucket name")
 
-    storage_list_cmd_parser = subparsers.add_parser("storage_list", help="list storages")
-    storage_list_cmd_parser.add_argument("--full", action="store_true", help="show object counts")
-    storage_list_cmd_parser.add_argument("--filter", default="", help="name filter regex")
+    _ = subparsers.add_parser("storage_list", help="list storages")
+
+    storage_info_cmd_parser = subparsers.add_parser("storage_info", help="show detailed storage info")
+    storage_info_cmd_parser.add_argument("bucket_name", help="bucket name")
 
     storage_drop_versions_cmd_parser = subparsers.add_parser(
         "storage_drop_versions",
@@ -606,7 +643,9 @@ def main(argv=None):  # pylint: disable=too-many-branches
     if args.command == "storage_delete":
         ret = rwmi.storage_delete(args.bucket_name)
     if args.command == "storage_list":
-        ret = rwmi.storage_list(args.full, args.filter)
+        ret = rwmi.storage_list()
+    if args.command == "storage_info":
+        ret = rwmi.storage_info(args.bucket_name)
     if args.command == "storage_drop_versions":
         ret = rwmi.storage_drop_versions(args.bucket_name)
     if args.command == "storage_restore_state":

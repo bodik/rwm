@@ -159,11 +159,26 @@ def test_storage_list(
     target_username = "test1"
 
     radosuser_admin.bucket_create("no-acl-dummy")
+    radosuser_admin.storage_create(bucket_name, target_username)
+    assert radosuser_admin.storage_list()
+
+
+def test_storage_info(
+    tmpworkdir: str,
+    microceph: str,
+    radosuser_admin: rwm.StorageManager,
+):  # pylint: disable=unused-argument
+    """test managet list storage"""
+
+    bucket_name = "rwmbackup-test1"
+    target_username = "test1"
+
     bucket = radosuser_admin.storage_create(bucket_name, target_username)
+    assert radosuser_admin.storage_list()
     bucket.upload_fileobj(BytesIO(b"dummydata1"), "dummykey")
     bucket.upload_fileobj(BytesIO(b"dummydata1"), "dummykey1")
     bucket.Object("dummykey1").delete()
-    assert len(radosuser_admin.storage_list(show_full=True, name_filter="a")) == 2
+    assert radosuser_admin.storage_info(bucket_name)["delete_markers"] == 1
 
 
 def test_storage_drop_versions(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument

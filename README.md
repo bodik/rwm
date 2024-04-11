@@ -83,9 +83,9 @@ Two distinct S3 accounts required (*admin*, *user1*)
 
 ```
 cp examples/rwm-admin.conf admin.conf
-rwm --confg admin.conf create_storage bucket1 user1
-rwm --confg admin.conf storage_check_policy bucket1
 rwm --confg admin.conf storage_list
+rwm --confg admin.conf storage_create bucket1 user1
+rwm --confg admin.conf storage_info bucket1
 
 cp examples/rwm-backups.conf rwm.conf
 rwm restic init

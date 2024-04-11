@@ -243,6 +243,19 @@ def test_storage_list(tmpworkdir: str):  # pylint: disable=unused-argument
         assert trwm.storage_list() == 0
 
 
+def test_storage_info(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+    """test storage_list"""
+
+    trwm = rwm.RWM({
+        "rwm_s3_endpoint_url": radosuser_admin.url,
+        "rwm_s3_access_key": radosuser_admin.access_key,
+        "rwm_s3_secret_key": radosuser_admin.secret_key,
+    })
+
+    trwm.storage_create("dummy", "dummy")
+    assert trwm.storage_info("dummy") == 0
+
+
 def test_storage_drop_versions(tmpworkdir: str):  # pylint: disable=unused-argument
     """test storage drop versions"""
 
@@ -287,7 +300,7 @@ def test_storage_restore_state_restic(tmpworkdir: str, radosuser_admin: rwm.Stor
     assert len(snapshots) == 2
     assert len(snapshot_files) == 1
     assert "/testdatadir/testdata2.txt" == snapshot_files[0]
-    states = sorted([x.key for x in trwm.storage_manager.s3.Bucket(trwm.config["rwm_restic_bucket"]).objects.filter(Prefix="rwm")])
+    states = sorted([x.key for x in trwm.storage_manager.s3.Bucket(trwm.config["rwm_restic_bucket"]).object_versions.filter(Prefix="rwm")])
     assert len(states) == 2
 
     # create restore bucket
