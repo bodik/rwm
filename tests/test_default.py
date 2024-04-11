@@ -39,7 +39,7 @@ def test_main(tmpworkdir: str):  # pylint: disable=unused-argument
     with patch.object(rwm.RWM, "restic_cmd", mock_proc):
         assert rwm_main(["restic", "dummy"]) == 0
 
-    with patch.object(rwm.RWM, "backup", mock_proc):
+    with patch.object(rwm.RWM, "backup", mock_ok):
         assert rwm_main(["backup", "dummy"]) == 0
     with patch.object(rwm.RWM, "backup_all", mock_ok):
         assert rwm_main(["backup_all"]) == 0

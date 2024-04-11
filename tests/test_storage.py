@@ -138,7 +138,7 @@ def test_storage_backup_usage(
         }
     })
     assert trwm.restic_cmd(["init"]).returncode == 0
-    assert trwm.backup("dummy").returncode == 0
+    assert trwm.backup("dummy") == 0
 
     assert radosuser_test1.list_objects(bucket_name)
     assert len(json.loads(trwm.restic_cmd(["snapshots", "--json"]).stdout)) == 1

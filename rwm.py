@@ -342,7 +342,7 @@ class RWM:
 
         return self.restic_cmd(cmd_args)
 
-    def backup(self, name) -> subprocess.CompletedProcess:
+    def backup(self, name) -> int:
         """backup command"""
 
         if not self.storage_manager.storage_check_policy(self.config["rwm_restic_bucket"]):
@@ -351,14 +351,14 @@ class RWM:
         wrap_output(backup_proc := self._restic_backup(name))
         if backup_proc.returncode != 0:
             logger.error("rwm _restic_backup failed")
-            return backup_proc
+            return 1
 
         wrap_output(forget_proc := self._restic_forget_prune())
         if forget_proc.returncode != 0:
             logger.error("rwm _restic_forget_prune failed")
-            return forget_proc
+            return 1
 
-        return backup_proc
+        return 0
 
     def backup_all(self) -> int:
         """backup all command"""
@@ -514,7 +514,7 @@ def main(argv=None):  # pylint: disable=too-many-branches
         ret = wrap_output(rwmi.restic_cmd(args.cmd_args))
 
     if args.command == "backup":
-        ret = rwmi.backup(args.name).returncode
+        ret = rwmi.backup(args.name)
         logger.info("rwm backup finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     if args.command == "backup_all":
         ret = rwmi.backup_all()

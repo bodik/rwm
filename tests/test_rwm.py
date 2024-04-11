@@ -80,7 +80,7 @@ def test_backup(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-arg
     Path("testdatadir/testfile_to_be_ignored").write_text("dummydata", encoding="utf-8")
 
     assert trwm.restic_cmd(["init"]).returncode == 0
-    assert trwm.backup("testcfg").returncode == 0
+    assert trwm.backup("testcfg") == 0
 
     snapshots = _restic_list_snapshots(trwm)
     assert len(snapshots) == 1
@@ -118,7 +118,7 @@ def test_backup_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=u
     Path("testdatadir/var/proc/data").write_text("dummydata", encoding="utf-8")
 
     assert trwm.restic_cmd(["init"]).returncode == 0
-    assert trwm.backup("testcfg").returncode == 0
+    assert trwm.backup("testcfg") == 0
 
     snapshots = _restic_list_snapshots(trwm)
     assert len(snapshots) == 1
@@ -140,19 +140,19 @@ def test_backup_error_handling(tmpworkdir: str, motoserver: str):  # pylint: dis
             "dummycfg": {"filesdirs": ["dummydir"]}
         }
     }
-    mock_ok = Mock(return_value=CompletedProcess(args='dummy', returncode=0))
-    mock_fail = Mock(return_value=CompletedProcess(args='dummy', returncode=11))
+    mock_proc_ok = Mock(return_value=CompletedProcess(args='dummy', returncode=0))
+    mock_proc_fail = Mock(return_value=CompletedProcess(args='dummy', returncode=2))
 
     with (
-        patch.object(rwm.RWM, "_restic_backup", mock_fail)
+        patch.object(rwm.RWM, "_restic_backup", mock_proc_fail)
     ):
-        assert rwm.RWM(rwm_conf).backup("dummycfg").returncode == 11
+        assert rwm.RWM(rwm_conf).backup("dummycfg") == 1
 
     with (
-        patch.object(rwm.RWM, "_restic_backup", mock_ok),
-        patch.object(rwm.RWM, "_restic_forget_prune", mock_fail)
+        patch.object(rwm.RWM, "_restic_backup", mock_proc_ok),
+        patch.object(rwm.RWM, "_restic_forget_prune", mock_proc_fail)
     ):
-        assert rwm.RWM(rwm_conf).backup("dummycfg").returncode == 11
+        assert rwm.RWM(rwm_conf).backup("dummycfg") == 1
 
 
 def test_backup_all(tmpworkdir: str):  # pylint: disable=unused-argument
@@ -163,11 +163,11 @@ def test_backup_all(tmpworkdir: str):  # pylint: disable=unused-argument
             "dummycfg": {"filesdirs": ["dummydir"]}
         }
     }
-    mock = Mock(return_value=CompletedProcess(args='dummy', returncode=0))
+    mock_proc_ok = Mock(return_value=CompletedProcess(args='dummy', returncode=0))
 
     with (
-        patch.object(rwm.RWM, "_restic_backup", mock),
-        patch.object(rwm.RWM, "_restic_forget_prune", mock)
+        patch.object(rwm.RWM, "_restic_backup", mock_proc_ok),
+        patch.object(rwm.RWM, "_restic_forget_prune", mock_proc_ok),
     ):
         assert rwm.RWM(rwm_conf).backup_all() == 0
 
@@ -209,7 +209,7 @@ def test_storage_delete(tmpworkdir: str, microceph: str, radosuser_admin: rwm.St
     bucket = trwm.storage_manager.storage_create(bucket_name, "admin")
     assert len(trwm.storage_manager.list_objects(bucket_name)) == 0
     assert trwm.restic_cmd(["init"]).returncode == 0
-    assert trwm.backup("testcfg").returncode == 0
+    assert trwm.backup("testcfg") == 0
     assert len(trwm.storage_manager.list_objects(bucket_name)) != 0
 
     object_versions = radosuser_admin.s3.meta.client.list_object_versions(Bucket=bucket.name)
