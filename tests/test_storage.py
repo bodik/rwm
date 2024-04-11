@@ -60,7 +60,7 @@ def test_storage_create(
         radosuser_test2.list_objects(bucket.name)
 
 
-def test_storage_delete(
+def test_storage_object_versioning(
         tmpworkdir: str,
         microceph: str,
         radosuser_admin: rwm.StorageManager,

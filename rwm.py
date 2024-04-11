@@ -163,8 +163,8 @@ class StorageManager:
     def storage_create(self, bucket_name, target_username):
         """create policed bucket"""
 
-        if (not bucket_name) or (not target_username):
-            raise ValueError("must specify value for bucket and user")
+        if not target_username:
+            raise ValueError("must specify value for bucket user")
 
         bucket = self.bucket_create(bucket_name)
         tenant, admin_username = bucket.Acl().owner["ID"].split("$")
@@ -333,6 +333,7 @@ class StorageManager:
     def storage_save_state(self, bucket_name):
         """save storage state into itself"""
 
+        # explicit error handling here, it's used during backup process
         try:
             bucket_state = self._bucket_state(bucket_name)
             now = datetime.now().astimezone().isoformat()
@@ -481,30 +482,13 @@ class RWM:
     def storage_create(self, bucket_name, target_username) -> int:
         """storage create command"""
 
-        try:
-            self.storage_manager.storage_create(bucket_name, target_username)
-        except (ClientError, BotoCoreError, ValueError) as exc:
-            logger.error("rwm storage_create error, %s", (exc))
-            return 1
+        self.storage_manager.storage_create(bucket_name, target_username)
         return 0
 
     def storage_delete(self, bucket_name) -> int:
         """storage delete command"""
 
-        try:
-            self.storage_manager.storage_delete(bucket_name)
-        except (ClientError, BotoCoreError) as exc:
-            logger.error("rwm storage_delete error, %s", (exc))
-            return 1
-        return 0
-
-    def storage_check_policy(self, bucket_name) -> int:
-        """storage check policy command"""
-
-        ret, msg = (0, "OK") if self.storage_manager.storage_check_policy(bucket_name) else (1, "FAILED")
-        logger.debug("bucket policy: %s", json.dumps(self.storage_manager.bucket_policy(bucket_name), indent=4))
-        print(msg)
-        return ret
+        return self.storage_manager.storage_delete(bucket_name)
 
     def storage_list(self, show_full=False, name_filter="") -> int:
         """storage_list command"""
@@ -569,9 +553,6 @@ def parse_arguments(argv):
     storage_delete_cmd_parser = subparsers.add_parser("storage_delete", help="delete storage")
     storage_delete_cmd_parser.add_argument("bucket_name", help="bucket name")
 
-    storage_check_policy_cmd_parser = subparsers.add_parser("storage_check_policy", help="check bucket policies; use --debug to show policy")
-    storage_check_policy_cmd_parser.add_argument("bucket_name", help="bucket name")
-
     storage_list_cmd_parser = subparsers.add_parser("storage_list", help="list storages")
     storage_list_cmd_parser.add_argument("--full", action="store_true", help="show object counts")
     storage_list_cmd_parser.add_argument("--filter", default="", help="name filter regex")
@@ -624,8 +605,6 @@ def main(argv=None):  # pylint: disable=too-many-branches
         ret = rwmi.storage_create(args.bucket_name, args.target_username)
     if args.command == "storage_delete":
         ret = rwmi.storage_delete(args.bucket_name)
-    if args.command == "storage_check_policy":
-        ret = rwmi.storage_check_policy(args.bucket_name)
     if args.command == "storage_list":
         ret = rwmi.storage_list(args.full, args.filter)
     if args.command == "storage_drop_versions":

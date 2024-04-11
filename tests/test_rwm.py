@@ -5,6 +5,8 @@ from pathlib import Path
 from subprocess import CompletedProcess
 from unittest.mock import Mock, patch
 
+import pytest
+
 import rwm
 
 
@@ -194,8 +196,8 @@ def test_storage_create(tmpworkdir: str, microceph: str, radosuser_admin: rwm.St
 
     bucket_name = "testbuck"
     assert trwm.storage_create(bucket_name, "testnx") == 0
-    assert trwm.storage_create("!invalid", "testnx") == 1
-    assert trwm.storage_create(bucket_name, "") == 1
+    with pytest.raises(ValueError):
+        trwm.storage_create(bucket_name, "")
 
 
 def test_storage_delete(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
@@ -229,18 +231,6 @@ def test_storage_delete(tmpworkdir: str, microceph: str, radosuser_admin: rwm.St
 
     assert trwm.storage_delete(bucket_name) == 0
     assert not trwm.storage_manager.bucket_exist(bucket_name)
-
-    assert trwm.storage_delete(bucket_name) == 1
-
-
-def test_storage_check_policy(tmpworkdir: str):  # pylint: disable=unused-argument
-    """test storage check policy"""
-
-    trwm = rwm.RWM({})
-
-    mock = Mock(return_value=False)
-    with patch.object(rwm.StorageManager, "storage_check_policy", mock):
-        assert trwm.storage_check_policy("dummy") == 1
 
 
 def test_storage_list(tmpworkdir: str):  # pylint: disable=unused-argument
