@@ -65,6 +65,16 @@ def wrap_output(process):
     return process.returncode
 
 
+def size_fmt(num):
+    """print value formated with human readable units"""
+
+    for unit in ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB']:
+        if abs(num) < 1024.0:
+            return f'{num:0.1f} {unit}'
+        num /= 1024.0
+    return f'{num:0.1f} YiB'
+
+
 @dataclasses.dataclass
 class BackupResult:
     """backup results data container"""
@@ -239,11 +249,10 @@ class StorageManager:
         output = []
 
         for bucket in buckets:
-            result = {
-                "name": bucket.name,
-                "policy": "OK" if self.storage_check_policy(bucket.name) else "FAILED",
-                "owner": self.bucket_owner(bucket.name).split("$")[-1]
-            }
+            result = {}
+            result["name"] = bucket.name
+            result["policy"] = "OK" if self.storage_check_policy(bucket.name) else "FAILED"
+            result["owner"] = self.bucket_owner(bucket.name).split("$")[-1]
 
             if result["policy"] == "OK":
                 user_statement = self._policy_statements_user(self.bucket_policy(bucket.name))[0]
@@ -253,12 +262,22 @@ class StorageManager:
 
             if show_full:
                 result["objects"] = 0
-                result["old_versions"] = 0
                 result["delete_markers"] = 0
+                result["old_versions"] = 0
+                result["size"] = 0
+                result["old_size"] = 0
+
                 for page in paginator.paginate(Bucket=bucket.name):
                     for obj in page.get("Versions", []):
-                        result["objects" if obj["IsLatest"] else "old_versions"] += 1
+                        if obj["IsLatest"]:
+                            result["objects"] += 1
+                            result["size"] += obj["Size"]
+                        else:
+                            result["old_versions"] += 1
+                            result["old_size"] += obj["Size"]
                     result["delete_markers"] += len(page.get("DeleteMarkers", []))
+                result["size"] = size_fmt(result["size"])
+                result["old_size"] = size_fmt(result["old_size"])
 
             output.append(result)
 

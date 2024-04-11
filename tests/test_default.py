@@ -5,7 +5,7 @@ from subprocess import CompletedProcess
 from unittest.mock import Mock, patch
 
 import rwm
-from rwm import is_sublist, main as rwm_main, wrap_output
+from rwm import is_sublist, main as rwm_main, size_fmt, wrap_output
 
 
 def test_sublist():
@@ -20,6 +20,13 @@ def test_wrap_output():
     """test wrap_output"""
 
     assert wrap_output(CompletedProcess(args='dummy', returncode=11, stdout="dummy", stderr="dummy")) == 11
+
+
+def test_size_fmt():
+    """test sizefmt"""
+
+    assert size_fmt(1024) == "1.0 KiB"
+    assert size_fmt(10**25) == "8.3 YiB"
 
 
 def test_main(tmpworkdir: str):  # pylint: disable=unused-argument

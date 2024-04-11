@@ -161,6 +161,8 @@ def test_storage_list(
     radosuser_admin.bucket_create("no-acl-dummy")
     bucket = radosuser_admin.storage_create(bucket_name, target_username)
     bucket.upload_fileobj(BytesIO(b"dummydata1"), "dummykey")
+    bucket.upload_fileobj(BytesIO(b"dummydata1"), "dummykey1")
+    bucket.Object("dummykey1").delete()
     assert len(radosuser_admin.storage_list(show_full=True, name_filter="a")) == 2
 
 
