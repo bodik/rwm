@@ -2,51 +2,55 @@
 
 ## The story
 
-Restic is a fast and secure backup program. Uses client-storage architecture to backup
-local filesystem to the variety of backends including local and remote storages such
-as S3. Given it's server-less nature, a backed-up resource has ability to manipulate it's
-backup storage. In case of server compromise a ransomware attacker is able to wipe out
-all backups.
+Restic is a fast and secure backup program that employs a client-storage
+architecture to backup local filesystems to various backends, including both
+local and remote storage options such as S3. Due to its server-less nature, a
+backed-up resource has the capability to manipulate its backup storage.
+However, in the event of a server compromise, a ransomware attacker could
+potentially wipe out all backups.
 
-S3 can ensure safety of all data ever put in the bucket with WORM (Object Locking)
-capabilities, such any object is immutable for it's configurable "lifetime", any update
-is stored as a version of the bucket object. Permissions to manipulate the objects and
-versions are subjected to access policies and can be delegated to access_keys/users
-with fine granularity.
+S3 provides robust data protection with features like versioning and object
+locking (WORM). When versioning is enabled on a bucket, any updates to objects
+are stored as new versions. Access permissions for manipulating objects and
+versions can be finely controlled through access policies, allowing delegation
+to access keys or users with precise granularity.
 
-RWM facilitates standard restic backup process, that for every successfull backup generates
-list of current contents of used S3 bucket, recording all current objects and their latest
-versions. RWM bucket state data can be later used to reconstruct state of the bucket for
-any saved point-in-time defeating possible deletion of the data in most recent versions of
-the protected bucket objects.
+RWM supports the standard restic backup process. For each backup performed, it
+records the final bucket state, including all objects and their latest version
+IDs. This bucket state data can then be used later to reconstruct the bucket to
+any saved point-in-time, preventing potential deletion of data in the most
+recent versions of the protected bucket objects.
 
-Using WORM protection makes the bucket contents ever-increasing in size. RWM workflow allows to
-check current state of the backup, and if found complete and correct, drop all non-latest
-versions of the bucket objects reclaiming free space on the underlying storage. This operation
-must be delegated to secure element residing outside of attacker's reach and would use privileged
-credentials for the managed bucket.
+Using versioning for protection leads to the continual growth of the bucket's
+contents. When the backup storage is verified to be complete and accurate, RWM
+allows for the removal of all non-latest versions of the bucket objects,
+freeing up space on the underlying storage. However, this task should be
+delegated to a secure entity beyond the attacker's reach and should utilize
+privileged credentials for managing the bucket.
+
+
+*There may be a proper WORM setup with object locking and lifecycle rules for me
+somewhere - if I only knew.*
 
 
 ## Features
 
 * low-level S3 access for aws cli
-* restic with S3 repository
-* simple backup manager/executor
-* storage manager
-  * create, delete and list policed storage buckets
-  * check if used bucket is configured with expected policies
-  * drop all versions to reclaim storage space
 
-TODO:
-* generate and store current bucket state state-data
-* recreate bucket contents on local filesystem (or remote bucket) acording to specified
-  state data
-* ??? check completeness of the current state of the bucket
+* performing backups
+  * restic with S3 repository
+  * simple backup manager/executor
+    * saves bucket state during backups
+
+* storage management
+  * create, delete and list policed storage buckets
+  * drop all versions to reclaim storage space
+  * restore saved bucket state to new bucket
 
 
 ## Known issues
 
-* During tests RGW is suspected to leak RADOS objects
+* During tests RGW is leaking RADOS objects (likely Ceph bug; TODO fix)
 
 * Unlike in other backup solutions, attacker with credentials can restore
   old data from the repository/bucket, this should be discussed (howto threat modeling ?)
@@ -79,24 +83,27 @@ rwm restic mount /mnt/restore
 
 ### RWM: backups with policed buckets
 
-Two distinct S3 accounts required (*admin*, *user1*)
+Two S3 accounts in the same tenant are required (*admin*, *user1*)
 
 ```
+# create storage
 cp examples/rwm-admin.conf admin.conf
 rwm --confg admin.conf storage_list
 rwm --confg admin.conf storage_create bucket1 user1
-rwm --confg admin.conf storage_info bucket1
 
+# do backups
 cp examples/rwm-backups.conf rwm.conf
 rwm restic init
-rwm storage_check_policy bucket1
-
 rwm backup_all
 rwm restic snapshots
 rwm restic mount /mnt/restore
 
-# if current storage state is consistent, one can drop old object versions from time to time to reclaim storage space
+# if storage is consistent, drop old object versions to reclaim storage space
 rwm --confg admin.conf storage_drop_versions bucket1
+
+# if storage gets corrupted, state can be restored to other bucket
+rwm --confg admin.conf storage_info bucket1  # select existing state file from here
+rwm --confg admin.conf storage_restore_state bucket1 bucket1-restore rwm/state_[timestamp].json.gz
 ```
 
 
