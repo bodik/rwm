@@ -261,3 +261,57 @@ def test_storage_drop_versions(tmpworkdir: str):  # pylint: disable=unused-argum
     mock = Mock(return_value=0)
     with patch.object(rwm.StorageManager, "storage_drop_versions", mock):
         assert trwm.storage_drop_versions("dummy") == 0
+
+
+def test_storage_restore_state_restic(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+    """test restore bucket from previous saved state"""
+
+    trwm = rwm.RWM({
+        "rwm_s3_endpoint_url": radosuser_admin.url,
+        "rwm_s3_access_key": radosuser_admin.access_key,
+        "rwm_s3_secret_key": radosuser_admin.secret_key,
+        "rwm_restic_bucket": "restictest",
+        "rwm_restic_password": "dummydummydummydummy",
+        "rwm_backups": {
+            "testcfg": {
+                "filesdirs": ["testdatadir/"],
+            }
+        }
+    })
+
+    # create and initialize storage
+    assert trwm.storage_create(trwm.config["rwm_restic_bucket"], "dummy") == 0
+    assert trwm.restic_cmd(["init"]).returncode == 0
+
+    # do backups
+    Path("testdatadir").mkdir()
+    Path("testdatadir/testdata1.txt").write_text("dummydata1", encoding="utf-8")
+    assert trwm.backup("testcfg") == 0
+    Path("testdatadir/testdata1.txt").unlink()
+    Path("testdatadir/testdata2.txt").write_text("dummydata2", encoding="utf-8")
+    assert trwm.backup("testcfg") == 0
+
+    # check two snapshots exists with expected content
+    snapshots = _restic_list_snapshots(trwm)
+    snapshot_files = _restic_list_snapshot_files(trwm, snapshots[1]["id"])
+    assert len(snapshots) == 2
+    assert len(snapshot_files) == 1
+    assert "/testdatadir/testdata2.txt" == snapshot_files[0]
+    states = sorted([x.key for x in trwm.storage_manager.s3.Bucket(trwm.config["rwm_restic_bucket"]).objects.filter(Prefix="rwm")])
+    assert len(states) == 2
+
+    # create restore bucket
+    restore_bucket_name = f'{trwm.config["rwm_restic_bucket"]}-restore'
+    trwm.storage_restore_state(trwm.config["rwm_restic_bucket"], restore_bucket_name, states[0])
+
+    # check restore bucket contents
+    trwm_restore = rwm.RWM({
+        **trwm.config,
+        "rwm_restic_bucket": restore_bucket_name
+    })
+    snapshots = _restic_list_snapshots(trwm_restore)
+    snapshot_files = _restic_list_snapshot_files(trwm_restore, snapshots[0]["id"])
+    assert len(snapshots) == 1
+    assert len(snapshot_files) == 1
+    assert "/testdatadir/testdata1.txt" == snapshot_files[0]
+    assert trwm_restore.restic_cmd(["check"]).returncode == 0

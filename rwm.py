@@ -346,6 +346,19 @@ class StorageManager:
 
         return 0
 
+    def storage_restore_state(self, source_bucket_name, target_bucket_name, state_object_key):
+        """create new bucket, copy data by selected state_file"""
+
+        target_bucket = self.storage_create(target_bucket_name, "dummy")
+        resp = self.s3.Bucket(source_bucket_name).Object(state_object_key).get()
+        state = json.loads(gzip.decompress(resp['Body'].read()))
+
+        for obj in state["versions"]:
+            if obj["IsLatest"]:
+                target_bucket.Object(obj["Key"]).copy({"Bucket": source_bucket_name, "Key": obj["Key"], "VersionId": obj["VersionId"]})
+
+        return 0
+
 
 class RWM:
     """rwm impl"""
@@ -508,6 +521,11 @@ class RWM:
 
         return self.storage_manager.storage_drop_versions(bucket_name)
 
+    def storage_restore_state(self, source_bucket, target_bucket, state_object_key):
+        """storage restore state"""
+
+        return self.storage_manager.storage_restore_state(source_bucket, target_bucket, state_object_key)
+
 
 def configure_logging(debug):
     """configure logger"""
@@ -564,6 +582,11 @@ def parse_arguments(argv):
     )
     storage_drop_versions_cmd_parser.add_argument("bucket_name", help="bucket name")
 
+    storage_restore_state_cmd_parser = subparsers.add_parser("storage_restore_state", help="restore bucketX stateX1 to bucketY")
+    storage_restore_state_cmd_parser.add_argument("source_bucket", help="source_bucket")
+    storage_restore_state_cmd_parser.add_argument("target_bucket", help="target_bucket; should not exist")
+    storage_restore_state_cmd_parser.add_argument("state", help="state object key in source bucket")
+
     return parser.parse_args(argv)
 
 
@@ -607,6 +630,8 @@ def main(argv=None):  # pylint: disable=too-many-branches
         ret = rwmi.storage_list(args.full, args.filter)
     if args.command == "storage_drop_versions":
         ret = rwmi.storage_drop_versions(args.bucket_name)
+    if args.command == "storage_restore_state":
+        ret = rwmi.storage_restore_state(args.source_bucket, args.target_bucket, args.state)
 
     logger.debug("rwm finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     return ret
