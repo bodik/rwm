@@ -437,6 +437,26 @@ class RWM:
 
         return self.restic_cmd(cmd_args)
 
+    def _runparts(self, parts_name, parts: list) -> int:
+        """run all commands in parts in shell"""
+
+        for part in parts:
+            logger.info("rwm _runparts %s shell command, %s", parts_name, json.dumps(part))
+            wrap_output(part_proc := run_command(part, shell=True))
+            if part_proc.returncode != 0:
+                logger.error("rwm _runparts failed")
+                return part_proc.returncode
+
+        return 0
+
+    def _prerun(self, name) -> int:
+        """prerun runparts stub"""
+        return self._runparts("prerun", self.config["rwm_backups"][name].get("prerun", []))
+
+    def _postrun(self, name) -> int:
+        """postrun runparts stub"""
+        return self._runparts("postrun", self.config["rwm_backups"][name].get("postrun", []))
+
     def backup(self, name) -> int:
         """backup command"""
 
@@ -445,9 +465,17 @@ class RWM:
         if not self.storage_manager.storage_check_policy(bucket_name):
             logger.warning("used bucket does not have expected policy")
 
+        if self._prerun(name) != 0:
+            logger.error("rwm _prerun failed")
+            return 1
+
         wrap_output(backup_proc := self._restic_backup(name))
         if backup_proc.returncode != 0:
             logger.error("rwm _restic_backup failed")
+            return 1
+
+        if self._postrun(name) != 0:
+            logger.error("rwm _postrun failed")
             return 1
 
         wrap_output(forget_proc := self._restic_forget_prune())

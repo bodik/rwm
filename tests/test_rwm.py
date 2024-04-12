@@ -56,6 +56,18 @@ def _restic_list_snapshot_files(trwm, snapshot_id):
     return [x["path"] for x in snapshot_ls if (x["struct_type"] == "node") and (x["type"] == "file")]
 
 
+def test_runparts(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
+    """test runparts"""
+
+    trwm = rwm.RWM({
+        "rwm_s3_endpoint_url": motoserver,
+        "rwm_s3_access_key": "dummy",
+        "rwm_s3_secret_key": "dummy",
+    })
+
+    assert trwm._runparts("tests", ["false"]) == 1  # pylint: disable=protected-access
+
+
 def test_backup(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
     """test backup"""
 
@@ -133,6 +145,36 @@ def test_backup_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=u
     assert "/testdatadir/var/proc/data" in snapshot_files
 
 
+def test_backup_runparts(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
+    """test backup"""
+
+    trwm = rwm.RWM({
+        "rwm_s3_endpoint_url": motoserver,
+        "rwm_s3_access_key": "dummy",
+        "rwm_s3_secret_key": "dummy",
+        "rwm_restic_bucket": "restictest",
+        "rwm_restic_password": "dummydummydummydummy",
+        "rwm_backups": {
+            "testcfg": {
+                "filesdirs": ["testdatadir/"],
+                "prerun": ["false || true"],
+                "postrun": ["true || false"]
+            }
+        }
+    })
+
+    mock_ok = Mock(return_value=0)
+    mock_proc_ok = Mock(return_value=CompletedProcess(args='dummy', returncode=0))
+
+    with (
+        patch.object(rwm.StorageManager, "storage_check_policy", mock_ok),
+        patch.object(rwm.RWM, "_restic_backup", mock_proc_ok),
+        patch.object(rwm.RWM, "_restic_forget_prune", mock_proc_ok),
+        patch.object(rwm.StorageManager, "storage_save_state", mock_ok)
+    ):
+        assert trwm.backup("testcfg") == 0
+
+
 def test_backup_error_handling(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
     """test backup command err cases"""
 
@@ -144,22 +186,40 @@ def test_backup_error_handling(tmpworkdir: str, motoserver: str):  # pylint: dis
     }
     mock_proc_ok = Mock(return_value=CompletedProcess(args='dummy', returncode=0))
     mock_proc_fail = Mock(return_value=CompletedProcess(args='dummy', returncode=2))
+    mock_ok = Mock(return_value=0)
     mock_fail = Mock(return_value=11)
 
     with (
+        patch.object(rwm.RWM, "_prerun", mock_fail)
+    ):
+        assert rwm.RWM(rwm_conf).backup("dummycfg") == 1
+
+    with (
+        patch.object(rwm.RWM, "_prerun", mock_ok),
         patch.object(rwm.RWM, "_restic_backup", mock_proc_fail)
     ):
         assert rwm.RWM(rwm_conf).backup("dummycfg") == 1
 
     with (
+        patch.object(rwm.RWM, "_prerun", mock_ok),
         patch.object(rwm.RWM, "_restic_backup", mock_proc_ok),
         patch.object(rwm.RWM, "_restic_forget_prune", mock_proc_fail)
     ):
         assert rwm.RWM(rwm_conf).backup("dummycfg") == 1
 
     with (
+        patch.object(rwm.RWM, "_prerun", mock_ok),
         patch.object(rwm.RWM, "_restic_backup", mock_proc_ok),
         patch.object(rwm.RWM, "_restic_forget_prune", mock_proc_ok),
+        patch.object(rwm.RWM, "_postrun", mock_fail)
+    ):
+        assert rwm.RWM(rwm_conf).backup("dummycfg") == 1
+
+    with (
+        patch.object(rwm.RWM, "_prerun", mock_ok),
+        patch.object(rwm.RWM, "_restic_backup", mock_proc_ok),
+        patch.object(rwm.RWM, "_restic_forget_prune", mock_proc_ok),
+        patch.object(rwm.RWM, "_postrun", mock_ok),
         patch.object(rwm.StorageManager, "storage_save_state", mock_fail)
     ):
         assert rwm.RWM(rwm_conf).backup("dummycfg") == 1

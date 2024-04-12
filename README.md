@@ -40,7 +40,8 @@ somewhere - if I only knew.*
 * performing backups
   * restic with S3 repository
   * simple backup manager/executor
-    * saves bucket state during backups
+    * prerun and postrun shell hooks
+    * bucket state saving after backups
 
 * storage management
   * create, delete and list policed storage buckets
