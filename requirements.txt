@@ -6,7 +6,6 @@ tabulate
 flake8
 coverage
 moto[server]
-pytest
-pytest-xprocess
 pylint
 pytest
+pytest-xprocess
