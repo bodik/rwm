@@ -14,9 +14,9 @@ def test_aws_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-ar
     """test aws command"""
 
     trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": motoserver,
-        "rwm_s3_access_key": "dummy",
-        "rwm_s3_secret_key": "dummy",
+        "s3_endpoint_url": motoserver,
+        "s3_access_key": "dummy",
+        "s3_secret_key": "dummy",
     })
     test_bucket = "testbucket"
 
@@ -33,11 +33,11 @@ def test_restic_cmd(tmpworkdir: str, motoserver: str):  # pylint: disable=unused
     """test restic command"""
 
     trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": motoserver,
-        "rwm_s3_access_key": "dummy",
-        "rwm_s3_secret_key": "dummy",
-        "rwm_restic_bucket": "restictest",
-        "rwm_restic_password": "dummydummydummydummy",
+        "s3_endpoint_url": motoserver,
+        "s3_access_key": "dummy",
+        "s3_secret_key": "dummy",
+        "restic_bucket": "restictest",
+        "restic_password": "dummydummydummydummy",
     })
 
     assert trwm.restic_cmd(["init"]).returncode == 0
@@ -56,13 +56,13 @@ def _restic_list_snapshot_files(trwm, snapshot_id):
     return [x["path"] for x in snapshot_ls if (x["struct_type"] == "node") and (x["type"] == "file")]
 
 
-def test_runparts(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
+def test_runparts(tmpworkdir: str):  # pylint: disable=unused-argument
     """test runparts"""
 
     trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": motoserver,
-        "rwm_s3_access_key": "dummy",
-        "rwm_s3_secret_key": "dummy",
+        "s3_endpoint_url": "http://dummy",
+        "s3_access_key": "dummy",
+        "s3_secret_key": "dummy",
     })
 
     assert trwm._runparts("tests", ["false"]) == 1  # pylint: disable=protected-access
@@ -72,19 +72,19 @@ def test_backup(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-arg
     """test backup"""
 
     trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": motoserver,
-        "rwm_s3_access_key": "dummy",
-        "rwm_s3_secret_key": "dummy",
-        "rwm_restic_bucket": "restictest",
-        "rwm_restic_password": "dummydummydummydummy",
-        "rwm_backups": {
+        "s3_endpoint_url": motoserver,
+        "s3_access_key": "dummy",
+        "s3_secret_key": "dummy",
+        "restic_bucket": "restictest",
+        "restic_password": "dummydummydummydummy",
+        "backups": {
             "testcfg": {
                 "filesdirs": ["testdatadir/"],
                 "excludes": ["testfile_to_be_ignored"],
                 "extras": ["--tag", "dummytag"],
             }
         },
-        "rwm_retention": {
+        "retention": {
             "keep-daily": "1"
         }
     })
@@ -106,12 +106,12 @@ def test_backup_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=u
     """test backu"""
 
     trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": motoserver,
-        "rwm_s3_access_key": "dummy",
-        "rwm_s3_secret_key": "dummy",
-        "rwm_restic_bucket": "restictest",
-        "rwm_restic_password": "dummydummydummydummy",
-        "rwm_backups": {
+        "s3_endpoint_url": motoserver,
+        "s3_access_key": "dummy",
+        "s3_secret_key": "dummy",
+        "restic_bucket": "restictest",
+        "restic_password": "dummydummydummydummy",
+        "backups": {
             "testcfg": {
                 "filesdirs": ["testdatadir/"],
                 "excludes": ["testdatadir/proc/*", "*.ignored"],
@@ -145,16 +145,16 @@ def test_backup_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=u
     assert "/testdatadir/var/proc/data" in snapshot_files
 
 
-def test_backup_runparts(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
+def test_backup_runparts(tmpworkdir: str):  # pylint: disable=unused-argument
     """test backup"""
 
     trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": motoserver,
-        "rwm_s3_access_key": "dummy",
-        "rwm_s3_secret_key": "dummy",
-        "rwm_restic_bucket": "restictest",
-        "rwm_restic_password": "dummydummydummydummy",
-        "rwm_backups": {
+        "s3_endpoint_url": "http://dummy",
+        "s3_access_key": "dummy",
+        "s3_secret_key": "dummy",
+        "restic_bucket": "restictest",
+        "restic_password": "dummydummydummydummy",
+        "backups": {
             "testcfg": {
                 "filesdirs": ["testdatadir/"],
                 "prerun": ["false || true"],
@@ -175,12 +175,15 @@ def test_backup_runparts(tmpworkdir: str, motoserver: str):  # pylint: disable=u
         assert trwm.backup("testcfg") == 0
 
 
-def test_backup_error_handling(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-argument
+def test_backup_error_handling(tmpworkdir: str):  # pylint: disable=unused-argument
     """test backup command err cases"""
 
     rwm_conf = {
-        "rwm_restic_bucket": "restictest",
-        "rwm_backups": {
+        "s3_endpoint_url": "http://dummy",
+        "s3_access_key": "dummy",
+        "s3_secret_key": "dummy",
+        "restic_bucket": "restictest",
+        "backups": {
             "dummycfg": {"filesdirs": ["dummydir"]}
         }
     }
@@ -229,8 +232,11 @@ def test_backup_all(tmpworkdir: str):  # pylint: disable=unused-argument
     """test backup_all"""
 
     rwm_conf = {
-        "rwm_restic_bucket": "restictest",
-        "rwm_backups": {
+        "s3_endpoint_url": "http://dummy",
+        "s3_access_key": "dummy",
+        "s3_secret_key": "dummy",
+        "restic_bucket": "restictest",
+        "backups": {
             "dummycfg": {"filesdirs": ["dummydir"]}
         }
     }
@@ -249,9 +255,9 @@ def test_storage_create(tmpworkdir: str, microceph: str, radosuser_admin: rwm.St
     """test_storage_create"""
 
     trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": radosuser_admin.url,
-        "rwm_s3_access_key": radosuser_admin.access_key,
-        "rwm_s3_secret_key": radosuser_admin.secret_key,
+        "s3_endpoint_url": radosuser_admin.url,
+        "s3_access_key": radosuser_admin.access_key,
+        "s3_secret_key": radosuser_admin.secret_key,
     })
 
     bucket_name = "testbuck"
@@ -264,18 +270,17 @@ def test_storage_delete(tmpworkdir: str, microceph: str, radosuser_admin: rwm.St
     """test_storage_delete"""
 
     trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": radosuser_admin.url,
-        "rwm_s3_access_key": radosuser_admin.access_key,
-        "rwm_s3_secret_key": radosuser_admin.secret_key,
-
-        "rwm_restic_bucket": "testbuck",
-        "rwm_restic_password": "dummydummydummydummy",
-        "rwm_backups": {
+        "s3_endpoint_url": radosuser_admin.url,
+        "s3_access_key": radosuser_admin.access_key,
+        "s3_secret_key": radosuser_admin.secret_key,
+        "restic_bucket": "testbuck",
+        "restic_password": "dummydummydummydummy",
+        "backups": {
             "testcfg": {"filesdirs": ["testdatadir/"]}
         }
     })
 
-    bucket_name = trwm.config["rwm_restic_bucket"]
+    bucket_name = trwm.config.restic_bucket
     Path("testdatadir").mkdir()
     Path("testdatadir/testdata1.txt").write_text("dummydata", encoding="utf-8")
 
@@ -296,7 +301,11 @@ def test_storage_delete(tmpworkdir: str, microceph: str, radosuser_admin: rwm.St
 def test_storage_list(tmpworkdir: str):  # pylint: disable=unused-argument
     """test storage_list"""
 
-    trwm = rwm.RWM({})
+    trwm = rwm.RWM({
+        "s3_endpoint_url": "http://dummy",
+        "s3_access_key": "dummy",
+        "s3_secret_key": "dummy"
+    })
 
     mock = Mock(return_value=[])
     with patch.object(rwm.StorageManager, "storage_list", mock):
@@ -307,9 +316,9 @@ def test_storage_info(tmpworkdir: str, microceph: str, radosuser_admin: rwm.Stor
     """test storage_list"""
 
     trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": radosuser_admin.url,
-        "rwm_s3_access_key": radosuser_admin.access_key,
-        "rwm_s3_secret_key": radosuser_admin.secret_key,
+        "s3_endpoint_url": radosuser_admin.url,
+        "s3_access_key": radosuser_admin.access_key,
+        "s3_secret_key": radosuser_admin.secret_key,
     })
 
     trwm.storage_create("dummy", "dummy")
@@ -319,7 +328,11 @@ def test_storage_info(tmpworkdir: str, microceph: str, radosuser_admin: rwm.Stor
 def test_storage_drop_versions(tmpworkdir: str):  # pylint: disable=unused-argument
     """test storage drop versions"""
 
-    trwm = rwm.RWM({})
+    trwm = rwm.RWM({
+        "s3_endpoint_url": "http://dummy",
+        "s3_access_key": "dummy",
+        "s3_secret_key": "dummy"
+    })
 
     mock = Mock(return_value=0)
     with patch.object(rwm.StorageManager, "storage_drop_versions", mock):
@@ -330,12 +343,12 @@ def test_storage_restore_state_restic(tmpworkdir: str, radosuser_admin: rwm.Stor
     """test restore bucket from previous saved state"""
 
     trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": radosuser_admin.url,
-        "rwm_s3_access_key": radosuser_admin.access_key,
-        "rwm_s3_secret_key": radosuser_admin.secret_key,
-        "rwm_restic_bucket": "restictest",
-        "rwm_restic_password": "dummydummydummydummy",
-        "rwm_backups": {
+        "s3_endpoint_url": radosuser_admin.url,
+        "s3_access_key": radosuser_admin.access_key,
+        "s3_secret_key": radosuser_admin.secret_key,
+        "restic_bucket": "restictest",
+        "restic_password": "dummydummydummydummy",
+        "backups": {
             "testcfg": {
                 "filesdirs": ["testdatadir/"],
             }
@@ -343,7 +356,7 @@ def test_storage_restore_state_restic(tmpworkdir: str, radosuser_admin: rwm.Stor
     })
 
     # create and initialize storage
-    assert trwm.storage_create(trwm.config["rwm_restic_bucket"], "dummy") == 0
+    assert trwm.storage_create(trwm.config.restic_bucket, "dummy") == 0
     assert trwm.restic_cmd(["init"]).returncode == 0
 
     # do backups
@@ -360,17 +373,17 @@ def test_storage_restore_state_restic(tmpworkdir: str, radosuser_admin: rwm.Stor
     assert len(snapshots) == 2
     assert len(snapshot_files) == 1
     assert "/testdatadir/testdata2.txt" == snapshot_files[0]
-    states = sorted([x.key for x in trwm.storage_manager.s3.Bucket(trwm.config["rwm_restic_bucket"]).object_versions.filter(Prefix="rwm")])
+    states = sorted([x.key for x in trwm.storage_manager.s3.Bucket(trwm.config.restic_bucket).object_versions.filter(Prefix="rwm")])
     assert len(states) == 2
 
     # create restore bucket
-    restore_bucket_name = f'{trwm.config["rwm_restic_bucket"]}-restore'
-    trwm.storage_restore_state(trwm.config["rwm_restic_bucket"], restore_bucket_name, states[0])
+    restore_bucket_name = f"{trwm.config.restic_bucket}-restore"
+    trwm.storage_restore_state(trwm.config.restic_bucket, restore_bucket_name, states[0])
 
     # check restore bucket contents
     trwm_restore = rwm.RWM({
-        **trwm.config,
-        "rwm_restic_bucket": restore_bucket_name
+        **dict(trwm.config),
+        "restic_bucket": restore_bucket_name
     })
     snapshots = _restic_list_snapshots(trwm_restore)
     snapshot_files = _restic_list_snapshot_files(trwm_restore, snapshots[0]["id"])

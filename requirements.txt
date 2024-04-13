@@ -1,4 +1,5 @@
 # runtime
+pydantic
 tabulate
 
 # dev

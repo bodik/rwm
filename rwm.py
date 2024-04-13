@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """rwm, restic/s3 worm manager"""
 
-import dataclasses
 import gzip
 import json
 import logging
@@ -10,13 +9,16 @@ import shlex
 import subprocess
 import sys
 from argparse import ArgumentParser
+from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
+from typing import List, Dict, Optional
 
 import boto3
 import yaml
 from botocore.exceptions import BotoCoreError, ClientError
+from pydantic import BaseModel, ConfigDict
 from tabulate import tabulate
 
 
@@ -32,14 +34,6 @@ def is_sublist(needle, haystack):
     if not needle:
         return True
     return any(haystack[i:i+len(needle)] == needle for i in range(len(haystack)))
-
-
-def get_config(path):
-    """load config"""
-
-    if Path(path).exists():
-        return yaml.safe_load(Path(path).read_text(encoding='utf-8')) or {}
-    return {}
 
 
 def run_command(*args, **kwargs):
@@ -74,26 +68,30 @@ def size_fmt(num):
     return f'{num:0.1f} YiB'
 
 
-@dataclasses.dataclass
-class BackupResult:
-    """backup results data container"""
+class BackupConfig(BaseModel):
+    """backup config model"""
 
-    name: str
-    returncode: int
-    time_start: datetime
-    time_end: datetime
+    model_config = ConfigDict(extra='forbid')
 
-    def to_dict(self):
-        """dict serializer"""
+    filesdirs: List[str]
+    excludes: Optional[List[str]] = []
+    extras: Optional[List[str]] = []
+    prerun: Optional[List[str]] = []
+    postrun: Optional[List[str]] = []
 
-        return {
-            "ident": "RESULT",
-            "name": self.name,
-            "status": "OK" if self.returncode == 0 else "ERROR",
-            "returncode": self.returncode,
-            "backup_start": self.time_start.isoformat(),
-            "backup_time": str(self.time_end-self.time_start),
-        }
+
+class RWMConfig(BaseModel):
+    """main config model"""
+
+    model_config = ConfigDict(extra='forbid')
+
+    s3_endpoint_url: str
+    s3_access_key: str
+    s3_secret_key: str
+    restic_bucket: Optional[str] = None
+    restic_password: Optional[str] = None
+    backups: Dict[str, BackupConfig] = {}
+    retention: Dict[str, str] = {}
 
 
 class RwmJSONEncoder(json.JSONEncoder):
@@ -373,15 +371,37 @@ class StorageManager:
         return 0
 
 
+@dataclass
+class BackupResult:
+    """backup results data container"""
+
+    name: str
+    returncode: int
+    time_start: datetime
+    time_end: datetime
+
+    def to_dict(self):
+        """dict serializer"""
+
+        return {
+            "ident": "RESULT",
+            "name": self.name,
+            "status": "OK" if self.returncode == 0 else "ERROR",
+            "returncode": self.returncode,
+            "backup_start": self.time_start.isoformat(),
+            "backup_time": str(self.time_end-self.time_start),
+        }
+
+
 class RWM:
     """rwm impl"""
 
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, config_dict):
+        self.config = RWMConfig(**config_dict)
         self.storage_manager = StorageManager(
-            config.get("rwm_s3_endpoint_url"),
-            config.get("rwm_s3_access_key"),
-            config.get("rwm_s3_secret_key")
+            self.config.s3_endpoint_url,
+            self.config.s3_access_key,
+            self.config.s3_secret_key
         )
 
     def aws_cmd(self, args) -> subprocess.CompletedProcess:
@@ -390,15 +410,15 @@ class RWM:
         env = {
             "PATH": os.environ["PATH"],
             "AWS_METADATA_SERVICE_NUM_ATTEMPTS": "0",
-            "AWS_ACCESS_KEY_ID": self.config["rwm_s3_access_key"],
-            "AWS_SECRET_ACCESS_KEY": self.config["rwm_s3_secret_key"]
+            "AWS_ACCESS_KEY_ID": self.config.s3_access_key,
+            "AWS_SECRET_ACCESS_KEY": self.config.s3_secret_key
         }
         if is_sublist(["s3", "mb"], args):
             # region must be set and empty for awscil >=2.x and ?du? ceph s3
             env.update({"AWS_DEFAULT_REGION": ""})
 
         # aws cli does not have endpoint-url as env config option
-        return run_command(["aws", "--endpoint-url", self.config["rwm_s3_endpoint_url"]] + args, env=env)
+        return run_command(["aws", "--endpoint-url", self.config.s3_endpoint_url] + args, env=env)
 
     def restic_cmd(self, args) -> subprocess.CompletedProcess:
         """restic command wrapper"""
@@ -406,10 +426,10 @@ class RWM:
         env = {
             "HOME": os.environ["HOME"],
             "PATH": os.environ["PATH"],
-            "AWS_ACCESS_KEY_ID": self.config["rwm_s3_access_key"],
-            "AWS_SECRET_ACCESS_KEY": self.config["rwm_s3_secret_key"],
-            "RESTIC_PASSWORD": self.config["rwm_restic_password"],
-            "RESTIC_REPOSITORY": f"s3:{self.config['rwm_s3_endpoint_url']}/{self.config['rwm_restic_bucket']}",
+            "AWS_ACCESS_KEY_ID": self.config.s3_access_key,
+            "AWS_SECRET_ACCESS_KEY": self.config.s3_secret_key,
+            "RESTIC_PASSWORD": self.config.restic_password,
+            "RESTIC_REPOSITORY": f"s3:{self.config.s3_endpoint_url}/{self.config.restic_bucket}",
         }
         return run_command(["restic"] + args, env=env)
 
@@ -417,12 +437,11 @@ class RWM:
         """runs restic backup by name"""
 
         logger.info(f"run restic_backup {name}")
-        conf = self.config["rwm_backups"][name]
+        conf = self.config.backups[name]
         excludes = []
-        for item in conf.get("excludes", []):
+        for item in conf.excludes:
             excludes += ["--exclude", item]
-        extras = conf.get("extras", [])
-        cmd_args = ["backup"] + extras + excludes + conf["filesdirs"]
+        cmd_args = ["backup"] + conf.extras + excludes + conf.filesdirs
 
         return self.restic_cmd(cmd_args)
 
@@ -431,7 +450,7 @@ class RWM:
 
         logger.info("run restic_forget_prune")
         keeps = []
-        for key, val in self.config.get("rwm_retention", {}).items():
+        for key, val in self.config.retention.items():
             keeps += [f"--{key}", val]
         cmd_args = ["forget", "--prune"] + keeps
 
@@ -451,18 +470,16 @@ class RWM:
 
     def _prerun(self, name) -> int:
         """prerun runparts stub"""
-        return self._runparts("prerun", self.config["rwm_backups"][name].get("prerun", []))
+        return self._runparts("prerun", self.config.backups[name].prerun)
 
     def _postrun(self, name) -> int:
         """postrun runparts stub"""
-        return self._runparts("postrun", self.config["rwm_backups"][name].get("postrun", []))
+        return self._runparts("postrun", self.config.backups[name].prerun)
 
     def backup(self, name) -> int:
         """backup command"""
 
-        bucket_name = self.config["rwm_restic_bucket"]
-
-        if not self.storage_manager.storage_check_policy(bucket_name):
+        if not self.storage_manager.storage_check_policy(self.config.restic_bucket):
             logger.warning("used bucket does not have expected policy")
 
         if self._prerun(name) != 0:
@@ -483,7 +500,7 @@ class RWM:
             logger.error("rwm _restic_forget_prune failed")
             return 1
 
-        if self.storage_manager.storage_save_state(bucket_name) != 0:
+        if self.storage_manager.storage_save_state(self.config.restic_bucket) != 0:
             logger.error("rwm storage_save_state failed")
             return 1
 
@@ -495,7 +512,7 @@ class RWM:
         stats = []
         ret = 0
 
-        for name in self.config["rwm_backups"].keys():
+        for name in self.config.backups:
             time_start = datetime.now()
             wrap_output(backup_proc := self._restic_backup(name))
             time_end = datetime.now()
@@ -510,7 +527,7 @@ class RWM:
             stats.append(BackupResult("_forget_prune", forget_proc.returncode, time_start, time_end))
 
         time_start = datetime.now()
-        save_state_ret = self.storage_manager.storage_save_state(self.config["rwm_restic_bucket"])
+        save_state_ret = self.storage_manager.storage_save_state(self.config.restic_bucket)
         time_end = datetime.now()
         ret |= save_state_ret
         stats.append(BackupResult("_storage_save_state", save_state_ret, time_start, time_end))
@@ -636,18 +653,23 @@ def parse_arguments(argv):
     return parser.parse_args(argv)
 
 
+def load_config(path):
+    """load config dict from file"""
+
+    config = {}
+    if path:
+        config = yaml.safe_load(Path(path).read_text(encoding='utf-8'))
+    logger.debug("config, %s", config)
+    return config
+
+
 def main(argv=None):  # pylint: disable=too-many-branches
     """main"""
 
     args = parse_arguments(argv)
     configure_logging(args.debug)
 
-    config = {}
-    if args.config:
-        config.update(get_config(args.config))
-    logger.debug("config, %s", config)
-    # assert config ?
-    rwmi = RWM(config)
+    rwmi = RWM(load_config(args.config))
     ret = -1
 
     if args.command == "version":

@@ -129,12 +129,12 @@ def test_storage_backup_usage(
     Path("testdir/testdata").write_text('dummy', encoding="utf-8")
 
     trwm = rwm.RWM({
-        "rwm_s3_endpoint_url": radosuser_test1.url,
-        "rwm_s3_access_key": radosuser_test1.access_key,
-        "rwm_s3_secret_key": radosuser_test1.secret_key,
-        "rwm_restic_bucket": bucket_name,
-        "rwm_restic_password": "dummydummydummydummy",
-        "rwm_backups": {
+        "s3_endpoint_url": radosuser_test1.url,
+        "s3_access_key": radosuser_test1.access_key,
+        "s3_secret_key": radosuser_test1.secret_key,
+        "restic_bucket": bucket_name,
+        "restic_password": "dummydummydummydummy",
+        "backups": {
             "dummy": {"filesdirs": ["testdir"]}
         }
     })
