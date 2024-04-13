@@ -76,7 +76,7 @@ to easily run in schedulers.
 cp examples/rwm-backups.conf rwm.conf
 rwm restic init
 
-rwm backup_all
+rwm backup-all
 rwm restic snapshots
 rwm restic mount /mnt/restore
 ```
@@ -89,22 +89,22 @@ Two S3 accounts in the same tenant are required (*admin*, *user1*)
 ```
 # create storage
 cp examples/rwm-admin.conf admin.conf
-rwm --confg admin.conf storage_list
-rwm --confg admin.conf storage_create bucket1 user1
+rwm --confg admin.conf storage-list
+rwm --confg admin.conf storage-create bucket1 user1
 
 # do backups
 cp examples/rwm-backups.conf rwm.conf
 rwm restic init
-rwm backup_all
+rwm backup-all
 rwm restic snapshots
 rwm restic mount /mnt/restore
 
 # if storage is consistent, drop old object versions to reclaim storage space
-rwm --confg admin.conf storage_drop_versions bucket1
+rwm --confg admin.conf storage-drop-versions bucket1
 
 # if storage gets corrupted, state can be restored to other bucket
-rwm --confg admin.conf storage_info bucket1  # select existing state file from here
-rwm --confg admin.conf storage_restore_state bucket1 bucket1-restore rwm/state_[timestamp].json.gz
+rwm --confg admin.conf storage-info bucket1  # select existing state file from here
+rwm --confg admin.conf storage-restore-state bucket1 bucket1-restore rwm/state_[timestamp].json.gz
 ```
 
 

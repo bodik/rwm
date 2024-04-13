@@ -625,27 +625,27 @@ def parse_arguments(argv):
     backup_cmd_parser = subparsers.add_parser("backup", help="perform backup")
     backup_cmd_parser.add_argument("name", help="backup name")
 
-    _ = subparsers.add_parser("backup_all", help="run all backups in config")
+    _ = subparsers.add_parser("backup-all", help="run all backups in config")
 
-    storage_create_cmd_parser = subparsers.add_parser("storage_create", help="create policed storage bucked")
+    storage_create_cmd_parser = subparsers.add_parser("storage-create", help="create policed storage bucked")
     storage_create_cmd_parser.add_argument("bucket_name", help="bucket name")
     storage_create_cmd_parser.add_argument("target_username", help="user to be granted limited RW access")
 
-    storage_delete_cmd_parser = subparsers.add_parser("storage_delete", help="delete storage")
+    storage_delete_cmd_parser = subparsers.add_parser("storage-delete", help="delete storage")
     storage_delete_cmd_parser.add_argument("bucket_name", help="bucket name")
 
-    _ = subparsers.add_parser("storage_list", help="list storages")
+    _ = subparsers.add_parser("storage-list", help="list storages")
 
-    storage_info_cmd_parser = subparsers.add_parser("storage_info", help="show detailed storage info")
+    storage_info_cmd_parser = subparsers.add_parser("storage-info", help="show detailed storage info")
     storage_info_cmd_parser.add_argument("bucket_name", help="bucket name")
 
     storage_drop_versions_cmd_parser = subparsers.add_parser(
-        "storage_drop_versions",
+        "storage-drop-versions",
         help="reclaim storage space; drop any old object versions from bucket"
     )
     storage_drop_versions_cmd_parser.add_argument("bucket_name", help="bucket name")
 
-    storage_restore_state_cmd_parser = subparsers.add_parser("storage_restore_state", help="restore bucketX stateX1 to bucketY")
+    storage_restore_state_cmd_parser = subparsers.add_parser("storage-restore-state", help="restore bucketX stateX1 to bucketY")
     storage_restore_state_cmd_parser.add_argument("source_bucket", help="source_bucket")
     storage_restore_state_cmd_parser.add_argument("target_bucket", help="target_bucket; should not exist")
     storage_restore_state_cmd_parser.add_argument("state", help="state object key in source bucket")
@@ -684,21 +684,21 @@ def main(argv=None):  # pylint: disable=too-many-branches
     if args.command == "backup":
         ret = rwmi.backup(args.name)
         logger.info("rwm backup finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
-    if args.command == "backup_all":
+    if args.command == "backup-all":
         ret = rwmi.backup_all()
         logger.info("rwm backup_all finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
 
-    if args.command == "storage_create":
+    if args.command == "storage-create":
         ret = rwmi.storage_create(args.bucket_name, args.target_username)
-    if args.command == "storage_delete":
+    if args.command == "storage-delete":
         ret = rwmi.storage_delete(args.bucket_name)
-    if args.command == "storage_list":
+    if args.command == "storage-list":
         ret = rwmi.storage_list()
-    if args.command == "storage_info":
+    if args.command == "storage-info":
         ret = rwmi.storage_info(args.bucket_name)
-    if args.command == "storage_drop_versions":
+    if args.command == "storage-drop-versions":
         ret = rwmi.storage_drop_versions(args.bucket_name)
-    if args.command == "storage_restore_state":
+    if args.command == "storage-restore-state":
         ret = rwmi.storage_restore_state(args.source_bucket, args.target_bucket, args.state)
 
     logger.debug("rwm finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)

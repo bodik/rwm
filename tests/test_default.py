@@ -28,37 +28,45 @@ def test_size_fmt():
     assert size_fmt(10**25) == "8.3 YiB"
 
 
+def _rwm_minconfig(args):
+    return rwm_main(["--config", "tests/rwmtest.conf"] + args)
+
+
 def test_main():
     """test main"""
 
-    def rwm_main_minconfig(args):
-        return rwm_main(["--config", "tests/rwmtest.conf"] + args)
-
-    assert rwm_main_minconfig(["version"]) == 0
+    assert _rwm_minconfig(["version"]) == 0
 
     # command branches
     mock_proc = Mock(return_value=CompletedProcess(args='dummy', returncode=0))
     mock_ok = Mock(return_value=0)
 
     with patch.object(rwm.RWM, "aws_cmd", mock_proc):
-        assert rwm_main_minconfig(["aws", "dummy"]) == 0
+        assert _rwm_minconfig(["aws", "dummy"]) == 0
+
     with patch.object(rwm.RWM, "restic_cmd", mock_proc):
-        assert rwm_main_minconfig(["restic", "dummy"]) == 0
+        assert _rwm_minconfig(["restic", "dummy"]) == 0
 
     with patch.object(rwm.RWM, "backup", mock_ok):
-        assert rwm_main_minconfig(["backup", "dummy"]) == 0
+        assert _rwm_minconfig(["backup", "dummy"]) == 0
+
     with patch.object(rwm.RWM, "backup_all", mock_ok):
-        assert rwm_main_minconfig(["backup_all"]) == 0
+        assert _rwm_minconfig(["backup-all"]) == 0
 
     with patch.object(rwm.RWM, "storage_create", mock_ok):
-        assert rwm_main_minconfig(["storage_create", "bucket", "user"]) == 0
+        assert _rwm_minconfig(["storage-create", "bucket", "user"]) == 0
+
     with patch.object(rwm.RWM, "storage_delete", mock_ok):
-        assert rwm_main_minconfig(["storage_delete", "bucket"]) == 0
+        assert _rwm_minconfig(["storage-delete", "bucket"]) == 0
+
     with patch.object(rwm.RWM, "storage_list", mock_ok):
-        assert rwm_main_minconfig(["storage_list"]) == 0
+        assert _rwm_minconfig(["storage-list"]) == 0
+
     with patch.object(rwm.RWM, "storage_info", mock_ok):
-        assert rwm_main_minconfig(["storage_info", "dummy"]) == 0
+        assert _rwm_minconfig(["storage-info", "dummy"]) == 0
+
     with patch.object(rwm.RWM, "storage_drop_versions", mock_ok):
-        assert rwm_main_minconfig(["storage_drop_versions", "bucket"]) == 0
+        assert _rwm_minconfig(["storage-drop-versions", "bucket"]) == 0
+
     with patch.object(rwm.RWM, "storage_restore_state", mock_ok):
-        assert rwm_main_minconfig(["storage_restore_state", "bucket", "bucket", "state"]) == 0
+        assert _rwm_minconfig(["storage-restore-state", "bucket", "bucket", "state"]) == 0
