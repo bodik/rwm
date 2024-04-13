@@ -20,7 +20,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from tabulate import tabulate
 
 
-__version__ = "0.3"
+__version__ = "1.0"
 logger = logging.getLogger("rwm")
 logger.setLevel(logging.INFO)
 
