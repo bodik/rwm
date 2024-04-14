@@ -15,8 +15,8 @@ freeze:
 lint: lint-py lint-yaml
 
 lint-py:
-	python3 -m flake8 rwm.py tests
-	python3 -m pylint rwm.py tests
+	python3 -m flake8 rwm.py tests scripts
+	python3 -m pylint rwm.py tests scripts
 
 lint-yaml:
 	yamllint --strict .

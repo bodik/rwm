@@ -132,9 +132,10 @@ rwm restic mount /mnt/restore
 
 ## Notes
 
-* executed tools stdout is buffered, eg. `restic mount` does not print immediate output as normal
-* passthrough full arguments to underlying tool with "--" (eg. `rwm aws -- s3api --help`).
-* runner microceph breaks on reboot because of symlink at /etc/ceph
+* Executed tools stdout is buffered, eg. `restic mount` does not print immediate output as normal
+* Passthrough full arguments to underlying tool with "--" (eg. `rwm aws -- s3api --help`).
+* TODO: elaborate and hardcode default retention (?restic keeps are tricky)
+
 
 
 ## Development
