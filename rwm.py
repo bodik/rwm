@@ -103,6 +103,28 @@ class RwmJSONEncoder(json.JSONEncoder):
         return super().default(o)  # pragma: nocover  ; no other type in processeda data
 
 
+@dataclass
+class BackupResult:
+    """backup results data container"""
+
+    name: str
+    returncode: int
+    time_start: datetime
+    time_end: datetime
+
+    def to_dict(self):
+        """dict serializer"""
+
+        return {
+            "ident": "RESULT",
+            "name": self.name,
+            "status": "OK" if self.returncode == 0 else "ERROR",
+            "returncode": self.returncode,
+            "backup_start": self.time_start.isoformat(),
+            "backup_time": str(self.time_end-self.time_start),
+        }
+
+
 class StorageManager:
     """s3 policed bucket manager"""
 
@@ -340,7 +362,7 @@ class StorageManager:
 
         return state
 
-    def storage_save_state(self, bucket_name):
+    def storage_save_state(self, bucket_name) -> int:
         """save storage state into itself"""
 
         # explicit error handling here, it's used during backup process
@@ -369,28 +391,6 @@ class StorageManager:
                 target_bucket.Object(obj["Key"]).copy({"Bucket": source_bucket_name, "Key": obj["Key"], "VersionId": obj["VersionId"]})
 
         return 0
-
-
-@dataclass
-class BackupResult:
-    """backup results data container"""
-
-    name: str
-    returncode: int
-    time_start: datetime
-    time_end: datetime
-
-    def to_dict(self):
-        """dict serializer"""
-
-        return {
-            "ident": "RESULT",
-            "name": self.name,
-            "status": "OK" if self.returncode == 0 else "ERROR",
-            "returncode": self.returncode,
-            "backup_start": self.time_start.isoformat(),
-            "backup_time": str(self.time_end-self.time_start),
-        }
 
 
 class RWM:
@@ -433,34 +433,36 @@ class RWM:
         }
         return run_command(["restic"] + args, env=env)
 
-    def _restic_backup(self, name) -> subprocess.CompletedProcess:
+    def _restic_backup(self, name) -> int:
         """runs restic backup by name"""
 
-        logger.info(f"run restic_backup {name}")
+        logger.info(f"_restic_backup {name}")
         conf = self.config.backups[name]
         excludes = []
         for item in conf.excludes:
             excludes += ["--exclude", item]
         cmd_args = ["backup"] + conf.extras + excludes + conf.filesdirs
 
-        return self.restic_cmd(cmd_args)
+        wrap_output(backup_proc := self.restic_cmd(cmd_args))
+        return backup_proc.returncode
 
-    def _restic_forget_prune(self) -> subprocess.CompletedProcess:
+    def _restic_forget_prune(self) -> int:
         """runs forget prune"""
 
-        logger.info("run restic_forget_prune")
+        logger.info("_restic_forget_prune")
         keeps = []
         for key, val in self.config.retention.items():
             keeps += [f"--{key}", val]
         cmd_args = ["forget", "--prune"] + keeps
 
-        return self.restic_cmd(cmd_args)
+        wrap_output(forget_proc := self.restic_cmd(cmd_args))
+        return forget_proc.returncode
 
-    def _runparts(self, parts_name, parts: list) -> int:
+    def _runparts(self, backup_name, parts_name) -> int:
         """run all commands in parts in shell"""
 
-        for part in parts:
-            logger.info("rwm _runparts %s shell command, %s", parts_name, json.dumps(part))
+        for part in getattr(self.config.backups[backup_name], parts_name):
+            logger.info(f"_runparts {parts_name} command, {json.dumps(part)}")
             wrap_output(part_proc := run_command(part, shell=True))
             if part_proc.returncode != 0:
                 logger.error("rwm _runparts failed")
@@ -468,63 +470,44 @@ class RWM:
 
         return 0
 
-    def _prerun(self, name) -> int:
-        """prerun runparts stub"""
-        return self._runparts("prerun", self.config.backups[name].prerun)
+    def _backup_one(self, name) -> int:
+        """perform backup"""
 
-    def _postrun(self, name) -> int:
-        """postrun runparts stub"""
-        return self._runparts("postrun", self.config.backups[name].prerun)
+        logger.info(f"_backup_one {name}")
+        if ret := self._runparts(name, "prerun"):
+            return ret
+        if ret := self._restic_backup(name):
+            return ret
+        if ret := self._runparts(name, "postrun"):
+            return ret
+        return 0
 
-    def backup(self, name) -> int:
-        """backup command"""
+    def backup(self, backup_selector: str | list) -> int:
+        """backup command. perform selected backup or all configured backups"""
+
+        stats = []
+        ret = 0
+        selected_backups = backup_selector if isinstance(backup_selector, list) else [backup_selector]
+        if any(name not in self.config.backups for name in selected_backups):
+            logger.error("invalid backup selector")
+            return 1
 
         if not self.storage_manager.storage_check_policy(self.config.restic_bucket):
             logger.warning("used bucket does not have expected policy")
 
-        if self._prerun(name) != 0:
-            logger.error("rwm _prerun failed")
-            return 1
-
-        wrap_output(backup_proc := self._restic_backup(name))
-        if backup_proc.returncode != 0:
-            logger.error("rwm _restic_backup failed")
-            return 1
-
-        if self._postrun(name) != 0:
-            logger.error("rwm _postrun failed")
-            return 1
-
-        wrap_output(forget_proc := self._restic_forget_prune())
-        if forget_proc.returncode != 0:
-            logger.error("rwm _restic_forget_prune failed")
-            return 1
-
-        if self.storage_manager.storage_save_state(self.config.restic_bucket) != 0:
-            logger.error("rwm storage_save_state failed")
-            return 1
-
-        return 0
-
-    def backup_all(self) -> int:
-        """backup all command"""
-
-        stats = []
-        ret = 0
-
-        for name in self.config.backups:
+        for name in selected_backups:
             time_start = datetime.now()
-            wrap_output(backup_proc := self._restic_backup(name))
+            backup_ret = self._backup_one(name)
             time_end = datetime.now()
-            ret |= backup_proc.returncode
-            stats.append(BackupResult(name, backup_proc.returncode, time_start, time_end))
+            ret |= backup_ret
+            stats.append(BackupResult(name, backup_ret, time_start, time_end))
 
         if ret == 0:
             time_start = datetime.now()
-            wrap_output(forget_proc := self._restic_forget_prune())
+            forget_ret = self._restic_forget_prune()
             time_end = datetime.now()
-            ret |= forget_proc.returncode
-            stats.append(BackupResult("_forget_prune", forget_proc.returncode, time_start, time_end))
+            ret |= forget_ret
+            stats.append(BackupResult("_forget_prune", forget_ret, time_start, time_end))
 
         time_start = datetime.now()
         save_state_ret = self.storage_manager.storage_save_state(self.config.restic_bucket)
@@ -532,9 +515,13 @@ class RWM:
         ret |= save_state_ret
         stats.append(BackupResult("_storage_save_state", save_state_ret, time_start, time_end))
 
-        logger.info("rwm backup_all results")
+        logger.info("backup results")
         print(tabulate([item.to_dict() for item in stats], headers="keys", numalign="left"))
         return ret
+
+    def backup_all(self) -> int:
+        """backup all stub"""
+        return self.backup(list(self.config.backups.keys()))
 
     def storage_create(self, bucket_name, target_username) -> int:
         """storage create command"""
@@ -678,30 +665,37 @@ def main(argv=None):  # pylint: disable=too-many-branches
 
     if args.command == "aws":
         ret = wrap_output(rwmi.aws_cmd(args.cmd_args))
+
     if args.command == "restic":
         ret = wrap_output(rwmi.restic_cmd(args.cmd_args))
 
     if args.command == "backup":
         ret = rwmi.backup(args.name)
-        logger.info("rwm backup finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
+        logger.info("backup finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
+
     if args.command == "backup-all":
         ret = rwmi.backup_all()
-        logger.info("rwm backup_all finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
+        logger.info("backup_all finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
 
     if args.command == "storage-create":
         ret = rwmi.storage_create(args.bucket_name, args.target_username)
+
     if args.command == "storage-delete":
         ret = rwmi.storage_delete(args.bucket_name)
+
     if args.command == "storage-list":
         ret = rwmi.storage_list()
+
     if args.command == "storage-info":
         ret = rwmi.storage_info(args.bucket_name)
+
     if args.command == "storage-drop-versions":
         ret = rwmi.storage_drop_versions(args.bucket_name)
+
     if args.command == "storage-restore-state":
         ret = rwmi.storage_restore_state(args.source_bucket, args.target_bucket, args.state)
 
-    logger.debug("rwm finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
+    logger.debug("finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     return ret
 
 

@@ -50,7 +50,7 @@ def test_main():
     with patch.object(rwm.RWM, "backup", mock_ok):
         assert _rwm_minconfig(["backup", "dummy"]) == 0
 
-    with patch.object(rwm.RWM, "backup_all", mock_ok):
+    with patch.object(rwm.RWM, "backup", mock_ok):
         assert _rwm_minconfig(["backup-all"]) == 0
 
     with patch.object(rwm.RWM, "storage_create", mock_ok):
