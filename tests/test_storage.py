@@ -112,6 +112,9 @@ def test_storage_check_policy(
     radosuser_admin.s3.Bucket(bucket_name).Versioning().suspend()
     assert not radosuser_test1.storage_check_policy(bucket_name)
 
+    # error handling
+    assert not radosuser_admin.storage_check_policy("!invalid_bucket_name")
+
 
 def test_storage_backup_usage(
     tmpworkdir: str,
