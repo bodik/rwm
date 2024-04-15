@@ -49,4 +49,4 @@ microceph: microceph-cleanup microceph-service
 
 runner:
 	apt-get install -y ansible
-	ansible-playbook ansible/playbook_gitlab_runner.yml
+	ansible-playbook scripts/playbook_gitlab_runner.yml
