@@ -450,6 +450,12 @@ class RWM:
         """runs forget prune"""
 
         logger.info("_restic_forget_prune")
+
+        if "keep-within" not in self.config.retention:
+            # if not keep-within, operational backups (eg. pre-upgrade backups) gets
+            # deleted, only last per day is kepth with keep-daily
+            logger.warning("keep-within not found in restic forget prune config")
+
         keeps = []
         for key, val in self.config.retention.items():
             keeps += [f"--{key}", val]
