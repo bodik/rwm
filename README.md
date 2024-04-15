@@ -61,7 +61,7 @@ somewhere - if I only knew.*
 
 ### Install
 ```
-git clone git@gitlab.cesnet.cz:radoslav_bodo/rwm.git /opt/rwm
+git clone https://gitlab.cesnet.cz/radoslav_bodo/rwm.git /opt/rwm
 cd /opt/rwm
 make install
 ```
@@ -153,7 +153,7 @@ make coverage lint
 ## Gitlab Runner
 
 ```
-git clone git@gitlab.cesnet.cz:radoslav_bodo/rwm.git /opt/rwm
+git clone https://gitlab.cesnet.cz/radoslav_bodo/rwm.git /opt/rwm
 cd /opt/rwm
 export RUNNER_URL=
 export RUNNER_TOKEN=
