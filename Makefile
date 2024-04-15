@@ -50,3 +50,9 @@ microceph: microceph-cleanup microceph-service
 runner:
 	apt-get install -y ansible
 	ansible-playbook scripts/playbook_gitlab_runner.yml
+
+docker-build:
+	sh scripts/docker.sh build
+
+docker-push:
+	sh scripts/docker.sh push
