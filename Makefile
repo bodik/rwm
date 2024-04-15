@@ -1,7 +1,7 @@
 all: coverage lint
 
 install:
-	apt-get -y install awscli python3-boto3 python3-pydantic python3-tabulate restic
+	apt-get -y install awscli python3-boto3 python3-pydantic python3-tabulate python3-yaml restic
 
 install-dev:
 	apt-get -y install python3-venv snapd yamllint
