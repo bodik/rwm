@@ -23,6 +23,12 @@
         state: restarted
 
   tasks:
+    - name: development env
+      shell:
+        cmd: make install install-dev microceph-service
+        chdir: /opt/rwm
+        creates: /snap/bin/microceph
+
     - name: gitlab-runner dependencies
       apt:
         name:
@@ -55,9 +61,3 @@
         group: root
         mode: 0600
       notify: gitlab-runner restart
-
-    - name: development env with microceph
-      shell:
-        cmd: make install install-dev microceph-service
-        chdir: /opt/rwm
-        creates: /snap/bin/microceph
