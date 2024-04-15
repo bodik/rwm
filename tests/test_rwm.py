@@ -236,7 +236,7 @@ def test_backup_error_handling(tmpworkdir: str):  # pylint: disable=unused-argum
         assert rwm.RWM(rwm_conf).backup("dummycfg") == 11
 
 
-def test_storage_create(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+def test_storage_create(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
     """test_storage_create"""
 
     trwm = rwm.RWM({
@@ -251,7 +251,7 @@ def test_storage_create(tmpworkdir: str, microceph: str, radosuser_admin: rwm.St
         trwm.storage_create(bucket_name, "")
 
 
-def test_storage_delete(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+def test_storage_delete(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
     """test_storage_delete"""
 
     trwm = rwm.RWM({
@@ -297,7 +297,7 @@ def test_storage_list(tmpworkdir: str):  # pylint: disable=unused-argument
         assert trwm.storage_list() == 0
 
 
-def test_storage_info(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+def test_storage_info(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
     """test storage_list"""
 
     trwm = rwm.RWM({

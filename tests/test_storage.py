@@ -13,7 +13,6 @@ import rwm
 
 def test_microceph_defaults(
         tmpworkdir: str,
-        microceph: str,
         radosuser_test1: rwm.StorageManager,
         radosuser_test2: rwm.StorageManager
 ):  # pylint: disable=unused-argument
@@ -41,7 +40,6 @@ def test_microceph_defaults(
 
 def test_storage_create(
     tmpworkdir: str,
-    microceph: str,
     radosuser_admin: rwm.StorageManager,
     radosuser_test1: rwm.StorageManager,
     radosuser_test2: rwm.StorageManager
@@ -62,7 +60,6 @@ def test_storage_create(
 
 def test_storage_object_versioning(
         tmpworkdir: str,
-        microceph: str,
         radosuser_admin: rwm.StorageManager,
         radosuser_test1: rwm.StorageManager,
 ):  # pylint: disable=unused-argument
@@ -93,7 +90,6 @@ def test_storage_object_versioning(
 
 def test_storage_check_policy(
     tmpworkdir: str,
-    microceph: str,
     radosuser_admin: rwm.StorageManager,
     radosuser_test1: rwm.StorageManager
 ):  # pylint: disable=unused-argument
@@ -118,7 +114,6 @@ def test_storage_check_policy(
 
 def test_storage_backup_usage(
     tmpworkdir: str,
-    microceph: str,
     radosuser_admin: rwm.StorageManager,
     radosuser_test1: rwm.StorageManager,
 ):  # pylint: disable=unused-argument
@@ -153,7 +148,6 @@ def test_storage_backup_usage(
 
 def test_storage_list(
     tmpworkdir: str,
-    microceph: str,
     radosuser_admin: rwm.StorageManager,
 ):  # pylint: disable=unused-argument
     """test managet list storage"""
@@ -168,7 +162,6 @@ def test_storage_list(
 
 def test_storage_info(
     tmpworkdir: str,
-    microceph: str,
     radosuser_admin: rwm.StorageManager,
 ):  # pylint: disable=unused-argument
     """test managet list storage"""
@@ -184,7 +177,7 @@ def test_storage_info(
     assert radosuser_admin.storage_info(bucket_name)["delete_markers"] == 1
 
 
-def test_storage_drop_versions(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+def test_storage_drop_versions(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
     """test manager storage_drop_versions"""
 
     bucket_name = "testbuckx"
@@ -211,7 +204,7 @@ def test_storage_drop_versions(tmpworkdir: str, microceph: str, radosuser_admin:
 
 
 @pytest.mark.skipif('PYTEST_SLOW' not in os.environ, reason='slow on devnode, runs in CI')
-def test_storage_drop_versions_many(tmpworkdir: str, microceph: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+def test_storage_drop_versions_many(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
     """test manager storage_drop_versions"""
 
     bucket_name = "testbuckx"
