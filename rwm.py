@@ -68,6 +68,35 @@ def size_fmt(num):
     return f'{num:0.1f} YiB'
 
 
+class BackupConfig(BaseModel):
+    """Configuration for backup operations.
+
+    Attributes:
+        filesdirs:
+            REQUIRED. List of files and directories to be backed up.
+
+        excludes:
+            List of patterns for `--exclude` options for `restic backup` commmand. Defaults to an empty list.
+
+        extras:
+            Additional options for the `restic backup` commmand. Defaults to an empty list.
+
+        prerun:
+            List of shell commands to execute before backup. Defaults to an empty list.
+
+        postrun:
+            List of shell commands to execute after backup. Defaults to an empty list.
+    """
+
+    model_config = ConfigDict(extra='forbid')
+
+    filesdirs: List[str]
+    excludes: List[str] = []
+    extras: List[str] = []
+    prerun: List[str] = []
+    postrun: List[str] = []
+
+
 class RWMConfig(BaseModel):
     """Main configuration for RWM. Configuration file format is YAML.
 
@@ -104,35 +133,6 @@ class RWMConfig(BaseModel):
     restic_password: Optional[str] = None
     backups: Dict[str, BackupConfig] = {}
     retention: Dict[str, str] = {}
-
-
-class BackupConfig(BaseModel):
-    """Configuration for backup operations.
-
-    Attributes:
-        filesdirs:
-            REQUIRED. List of files and directories to be backed up.
-
-        excludes:
-            List of patterns for `--exclude` options for `restic backup` commmand. Defaults to an empty list.
-
-        extras:
-            Additional options for the `restic backup` commmand. Defaults to an empty list.
-
-        prerun:
-            List of shell commands to execute before backup. Defaults to an empty list.
-
-        postrun:
-            List of shell commands to execute after backup. Defaults to an empty list.
-    """
-
-    model_config = ConfigDict(extra='forbid')
-
-    filesdirs: List[str]
-    excludes: List[str] = []
-    extras: List[str] = []
-    prerun: List[str] = []
-    postrun: List[str] = []
 
 
 class RwmJSONEncoder(json.JSONEncoder):
