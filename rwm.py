@@ -68,20 +68,32 @@ def size_fmt(num):
     return f'{num:0.1f} YiB'
 
 
-class BackupConfig(BaseModel):
-    """backup config model"""
-
-    model_config = ConfigDict(extra='forbid')
-
-    filesdirs: List[str]
-    excludes: Optional[List[str]] = []
-    extras: Optional[List[str]] = []
-    prerun: Optional[List[str]] = []
-    postrun: Optional[List[str]] = []
-
-
 class RWMConfig(BaseModel):
-    """main config model"""
+    """Main configuration for RWM. Configuration file format is YAML.
+
+    Attributes:
+        s3_endpoint_url:
+            REQUIRED. The endpoint URL for S3.
+
+        s3_access_key:
+            REQUIRED. Access key for S3.
+
+        s3_secret_key:
+            REQUIRED. Secret key for S3.
+
+        restic_bucket:
+            Bucket for Restic backup repository.
+
+        restic_password:
+            Password for Restic backup repository.
+
+        backups:
+            Dictionary containing named backup configurations.
+
+        retention:
+            Dictionary containing retention policies for Restic repository. 
+            Keys and values corresponds to a `restic forget` command `--keep*` options without leading dashes.
+    """
 
     model_config = ConfigDict(extra='forbid')
 
@@ -92,6 +104,35 @@ class RWMConfig(BaseModel):
     restic_password: Optional[str] = None
     backups: Dict[str, BackupConfig] = {}
     retention: Dict[str, str] = {}
+
+
+class BackupConfig(BaseModel):
+    """Configuration for backup operations.
+
+    Attributes:
+        filesdirs:
+            REQUIRED. List of files and directories to be backed up.
+
+        excludes:
+            List of patterns for `--exclude` options for `restic backup` commmand. Defaults to an empty list.
+
+        extras:
+            Additional options for the `restic backup` commmand. Defaults to an empty list.
+
+        prerun:
+            List of shell commands to execute before backup. Defaults to an empty list.
+
+        postrun:
+            List of shell commands to execute after backup. Defaults to an empty list.
+    """
+
+    model_config = ConfigDict(extra='forbid')
+
+    filesdirs: List[str]
+    excludes: List[str] = []
+    extras: List[str] = []
+    prerun: List[str] = []
+    postrun: List[str] = []
 
 
 class RwmJSONEncoder(json.JSONEncoder):

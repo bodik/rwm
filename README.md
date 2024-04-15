@@ -60,11 +60,15 @@ somewhere - if I only knew.*
 ## Usage
 
 ### Install
+
 ```
 git clone https://gitlab.cesnet.cz/radoslav_bodo/rwm.git /opt/rwm
 cd /opt/rwm
 make install
 ```
+
+Configuration file uses YAML format, see `examples/` for basic use-cases or
+`rwm.RWMConfig` autodoc for full reference.
 
 
 ### RWM: simple backups
