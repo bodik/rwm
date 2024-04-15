@@ -120,7 +120,7 @@ class RWMConfig(BaseModel):
             Dictionary containing named backup configurations.
 
         retention:
-            Dictionary containing retention policies for Restic repository. 
+            Dictionary containing retention policies for Restic repository.
             Keys and values corresponds to a `restic forget` command `--keep*` options without leading dashes.
     """
 

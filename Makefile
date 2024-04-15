@@ -1,10 +1,10 @@
 all: coverage lint
 
 install:
-	apt-get -y install awscli python3-boto3 python3-pydantic python3-tabulate restic yamllint
+	apt-get -y install awscli python3-boto3 python3-pydantic python3-tabulate restic
 
 install-dev:
-	apt-get -y install python3-venv snapd
+	apt-get -y install python3-venv snapd yamllint
 	python3 -m venv venv
 	venv/bin/pip install -U pip
 	venv/bin/pip install -r requirements.lock
@@ -19,7 +19,7 @@ lint-py:
 	python3 -m pylint rwm.py tests scripts
 
 lint-yaml:
-	yamllint --strict .
+	yamllint --strict . examples/*.conf
 
 test:
 	# show stderr with "-o log_cli=true"
