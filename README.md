@@ -1,5 +1,9 @@
 # RWM - Restic WORM Manager
 
+* master ![](https://gitlab.cesnet.cz/radoslav_bodo/rwm/badges/master/pipeline.svg)
+* devel ![](https://gitlab.cesnet.cz/radoslav_bodo/rwm/badges/devel/pipeline.svg)
+
+
 ## The story
 
 Restic is a fast and secure backup program that employs a client-storage
