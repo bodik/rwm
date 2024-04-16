@@ -709,7 +709,7 @@ def parse_arguments(argv):
     return parser.parse_args(argv)
 
 
-def load_config(path):
+def load_config(path) -> dict:
     """load config dict from file"""
 
     config = {}
@@ -718,9 +718,10 @@ def load_config(path):
         config_perms = config_path.stat().st_mode & 0o777
         if config_perms != 0o600:
             logger.warning(f"config file permissions ({config_perms:o}) are too-open")
-        config = yaml.safe_load(config_path.read_text(encoding='utf-8'))
-    except (OSError, ValueError) as exc:
+        config = dict(yaml.safe_load(config_path.read_text(encoding='utf-8')))
+    except (OSError, TypeError, ValueError) as exc:
         logger.error(f"cannot load config file, {exc}")
+
     logger.debug("config, %s", config)
     return config
 
