@@ -376,7 +376,7 @@ def test_storage_restore_state_restic(tmpworkdir: str, radosuser_admin: rwm.Stor
     assert len(snapshots) == 2
     assert len(snapshot_files) == 1
     assert "/testdatadir/testdata2.txt" == snapshot_files[0]
-    states = sorted([x.key for x in trwm.storage_manager.s3.Bucket(trwm.config.restic_bucket).object_versions.filter(Prefix="rwm")])
+    states = sorted([x.key for x in trwm.storage_manager.s3.Bucket(trwm.config.restic_bucket).object_versions.filter(Prefix="rwm/")])
     assert len(states) == 2
 
     # create restore bucket

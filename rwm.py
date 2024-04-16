@@ -376,15 +376,29 @@ class StorageManager:
                     result["old_size"] += obj["Size"]
             result["delete_markers"] += len(page.get("DeleteMarkers", []))
 
-        for page in paginator.paginate(Bucket=bucket_name, Prefix="rwm"):
-            result["saved_states"] += [x["Key"] for x in page.get("Versions", [])]
+        paginator = self.s3.meta.client.get_paginator('list_objects')
+        for page in paginator.paginate(Bucket=bucket_name, Prefix="rwm/"):
+            result["saved_states"] += [x["Key"] for x in page.get("Contents", [])]
 
         return result
 
     def storage_drop_versions(self, bucket_name):
-        """deletes all old versions and delete markers from storage to reclaim space"""
+        """
+        Delete all old versions and delete markers from storage to reclaim space.
+        Also delete all rwm saved states and generate one state after pruning.
+        """
 
         # ? lock repo
+
+        # drop all saved rwm states
+        paginator = self.s3.meta.client.get_paginator('list_objects')
+        objects = []
+        for page in paginator.paginate(Bucket=bucket_name, Prefix="rwm/"):
+            for item in page.get("Contents", []):
+                objects.append((bucket_name, item["Key"]))
+        for item in objects:
+            self.s3.Object(*item).delete()
+
         paginator = self.s3.meta.client.get_paginator('list_object_versions')
 
         # drop all active object versions
@@ -392,7 +406,7 @@ class StorageManager:
         for page in paginator.paginate(Bucket=bucket_name):
             for item in page.get("Versions", []):
                 if not item["IsLatest"]:
-                    objects.append([bucket_name, item["Key"], item["VersionId"]])
+                    objects.append((bucket_name, item["Key"], item["VersionId"]))
         for item in objects:
             self.s3.ObjectVersion(*item).delete()
 
@@ -400,11 +414,14 @@ class StorageManager:
         objects = []
         for page in paginator.paginate(Bucket=bucket_name):
             for item in page.get("DeleteMarkers", []):
-                objects.append([bucket_name, item["Key"], item["VersionId"]])
+                objects.append((bucket_name, item["Key"], item["VersionId"]))
         for item in objects:
             self.s3.ObjectVersion(*item).delete()
 
-        return 0
+        # save current state
+        ret = self.storage_save_state(bucket_name)
+
+        return ret
 
     def _bucket_state(self, bucket_name):
         """dumps current bucket state into dict"""

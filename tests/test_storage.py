@@ -189,19 +189,21 @@ def test_storage_drop_versions(tmpworkdir: str, radosuser_admin: rwm.StorageMana
     bucket.upload_fileobj(BytesIO(b"dummydata2"), "dummykey")
     bucket.Object("dummykey").delete()
     bucket.upload_fileobj(BytesIO(b"dummydata3"), "dummykey")
+    radosuser_admin.storage_save_state(bucket.name)
 
     # boto3 resource api
     object_versions = list(bucket.object_versions.all())
-    assert len(object_versions) == 4
+    assert len(object_versions) == 5
     # boto3 client api
     object_versions = radosuser_admin.s3.meta.client.list_object_versions(Bucket=bucket.name)
-    assert len(object_versions["Versions"]) == 3
+    assert len(object_versions["Versions"]) == 4
     assert len(object_versions["DeleteMarkers"]) == 1
 
     assert radosuser_admin.storage_drop_versions(bucket.name) == 0
 
     object_versions = list(bucket.object_versions.all())
-    assert len(object_versions) == 1
+    # should be one object and one saved state
+    assert len(object_versions) == 2
 
 
 @pytest.mark.skipif('PYTEST_SLOW' not in os.environ, reason='slow on devnode, runs in CI')
@@ -220,7 +222,8 @@ def test_storage_drop_versions_many(tmpworkdir: str, radosuser_admin: rwm.Storag
     assert radosuser_admin.storage_drop_versions(bucket.name) == 0
 
     object_versions = list(bucket.object_versions.all())
-    assert len(object_versions) == 1
+    # should be one object and one saved state
+    assert len(object_versions) == 2
 
 
 def test_storage_save_state_error_handling(tmpworkdir: str):  # pylint: disable=unused-argument
