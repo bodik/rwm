@@ -713,8 +713,14 @@ def load_config(path):
     """load config dict from file"""
 
     config = {}
-    if path:
-        config = yaml.safe_load(Path(path).read_text(encoding='utf-8'))
+    try:
+        config_path = Path(path)
+        config_perms = config_path.stat().st_mode & 0o777
+        if config_perms != 0o600:
+            logger.warning(f"config file permissions ({config_perms:o}) are too-open")
+        config = yaml.safe_load(config_path.read_text(encoding='utf-8'))
+    except (OSError, ValueError) as exc:
+        logger.error(f"cannot load config file, {exc}")
     logger.debug("config, %s", config)
     return config
 
@@ -725,7 +731,9 @@ def main(argv=None):  # pylint: disable=too-many-branches
     args = parse_arguments(argv)
     configure_logging(args.debug)
 
-    rwmi = RWM(load_config(args.config))
+    if not (config_dict := load_config(args.config)):
+        return 1
+    rwmi = RWM(config_dict)
     ret = -1
 
     if args.command == "version":
