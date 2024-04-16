@@ -205,8 +205,8 @@ def test_backup_error_handling(tmpworkdir: str):  # pylint: disable=unused-argum
         }
     }
 
-    mock_false = Mock(return_value=False)
     mock_true = Mock(return_value=True)
+    mock_false = Mock(return_value=False)
     mock_ok = Mock(return_value=0)
     mock_fail = Mock(return_value=11)
 
@@ -214,6 +214,7 @@ def test_backup_error_handling(tmpworkdir: str):  # pylint: disable=unused-argum
 
     with (
         patch.object(rwm.StorageManager, "storage_check_policy", mock_false),
+        patch.object(rwm.StorageManager, "storage_check_selfowned", mock_true),
         patch.object(rwm.RWM, "_backup_one", mock_fail),
         patch.object(rwm.StorageManager, "storage_save_state", mock_ok)
     ):
@@ -221,6 +222,7 @@ def test_backup_error_handling(tmpworkdir: str):  # pylint: disable=unused-argum
 
     with (
         patch.object(rwm.StorageManager, "storage_check_policy", mock_true),
+        patch.object(rwm.StorageManager, "storage_check_selfowned", mock_false),
         patch.object(rwm.RWM, "_backup_one", mock_ok),
         patch.object(rwm.RWM, "_restic_forget_prune", mock_fail),
         patch.object(rwm.StorageManager, "storage_save_state", mock_ok)
@@ -229,6 +231,7 @@ def test_backup_error_handling(tmpworkdir: str):  # pylint: disable=unused-argum
 
     with (
         patch.object(rwm.StorageManager, "storage_check_policy", mock_true),
+        patch.object(rwm.StorageManager, "storage_check_selfowned", mock_false),
         patch.object(rwm.RWM, "_backup_one", mock_ok),
         patch.object(rwm.RWM, "_restic_forget_prune", mock_ok),
         patch.object(rwm.StorageManager, "storage_save_state", mock_fail)
