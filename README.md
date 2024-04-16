@@ -143,10 +143,37 @@ rwm restic mount /mnt/restore
 
 ## Notes
 
-* Executed tools stdout is buffered, eg. `restic mount` does not print immediate output as normal
+* Executed tools stdout is buffered, eg. `restic mount` does not print immediate output as normal.
 * Passthrough full arguments to underlying tool with "--" (eg. `rwm aws -- s3api --help`).
-* TODO: elaborate and hardcode default retention (?restic keeps are tricky)
+* TODO: elaborate and hardcode default retention (?restic keeps are tricky).
+* TODO: microceph in CI runner break sometimes, reinstall microceph and reboot to salvage it.
 
+
+## DU S3 Account provisioning via e-infra.cz
+
+1. Ensure the existence of the Perun Virtual Organization (VO) whose members
+   will utilize CESNET Data Storage (DS) services.
+
+2. Create a VO group named `project_backup` to organize storage service accounts.
+   This group will be associated with the Ceph S3 tenant.
+
+3. Establish the following Perun VO service identities:
+    * `project_admin`
+    * `project_backedresource1`
+    * `project_backedresource2`
+    * ...
+
+    Add these identities as members of the project_backup group.
+
+4. Generate S3 access credentials for each identity through the DS web portal.
+
+5. Utilize the `project_admin` identity to create policed storage buckets. Note
+   that bucket names cannot be changed once created.
+
+6. Perform backups using the designated resource identities
+   (`project_backedresource1` and `project_backedresource2`).
+
+7. Employ the project_admin identity to execute maintenance tasks as necessary.
 
 
 ## Development
