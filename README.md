@@ -145,6 +145,8 @@ rwm restic mount /mnt/restore
 
 * Executed tools stdout is buffered, eg. `restic mount` does not print immediate output as normal.
 * Passthrough full arguments to underlying tool with "--" (eg. `rwm aws -- s3api --help`).
+* When running backup from container, container hostname must be fixed for restic to find
+  parent backup properly
 * TODO: elaborate and hardcode default retention (?restic keeps are tricky).
 * TODO: microceph in CI runner break sometimes, reinstall microceph and reboot to salvage it.
 
@@ -173,7 +175,7 @@ rwm restic mount /mnt/restore
 6. Perform backups using the designated resource identities
    (`project_backedresource1` and `project_backedresource2`).
 
-7. Employ the project_admin identity to execute maintenance tasks as necessary.
+7. Employ the `project_admin` identity to execute maintenance tasks as necessary.
 
 
 ## Development

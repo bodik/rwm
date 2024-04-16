@@ -29,7 +29,7 @@ case "$1" in
 
     run)
         shift
-        docker run --rm -v "$(pwd)/rwm.conf:/opt/rwm/rwm.conf" -it "${REGISTRY_URL}/${IMAGE_NAME}:${BRANCH}" "$@"
+        docker run --rm -h "$(hostname)" -v "$(pwd)/rwm.conf:/opt/rwm/rwm.conf" -it "${REGISTRY_URL}/${IMAGE_NAME}:${BRANCH}" "$@"
     ;;
 
     *)
