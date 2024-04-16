@@ -60,6 +60,9 @@ somewhere - if I only knew.*
 * Unlike in other backup solutions, attacker with credentials can restore
   old data from the repository/bucket, this should be discussed (howto threat modeling ?)
 
+* When rwm restic mount ends while the mountpoint is busy (or being used by another process),
+  the FUSE mountpoint is not removed.
+
 
 ## Usage
 
