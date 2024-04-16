@@ -133,7 +133,8 @@ def test_backup(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-arg
         },
         "retention": {
             "keep-daily": "1"
-        }
+        },
+        "lock_path": f"{tmpworkdir}/rwm.lock",
     })
 
     Path("testdatadir").mkdir()
@@ -164,7 +165,8 @@ def test_backup_excludes(tmpworkdir: str, motoserver: str):  # pylint: disable=u
                 "excludes": ["testdatadir/proc/*", "*.ignored"],
                 "extras": ["--tag", "dummytag"],
             }
-        }
+        },
+        "lock_path": f"{tmpworkdir}/rwm.lock",
     })
 
     Path("testdatadir").mkdir()
@@ -202,7 +204,8 @@ def test_backup_error_handling(tmpworkdir: str):  # pylint: disable=unused-argum
         "restic_bucket": "restictest",
         "backups": {
             "dummycfg": {"filesdirs": ["dummydir"]}
-        }
+        },
+        "lock_path": f"{tmpworkdir}/rwm.lock",
     }
 
     mock_true = Mock(return_value=True)
@@ -275,7 +278,8 @@ def test_storage_delete(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  
         "restic_password": "dummydummydummydummy",
         "backups": {
             "testcfg": {"filesdirs": ["testdatadir/"]}
-        }
+        },
+        "lock_path": f"{tmpworkdir}/rwm.lock",
     })
 
     bucket_name = trwm.config.restic_bucket
@@ -350,7 +354,8 @@ def test_storage_restore_state_restic(tmpworkdir: str, radosuser_admin: rwm.Stor
             "testcfg": {
                 "filesdirs": ["testdatadir/"],
             }
-        }
+        },
+        "lock_path": f"{tmpworkdir}/rwm.lock",
     })
 
     # create and initialize storage
@@ -394,7 +399,7 @@ def test_storage_restore_state_restic(tmpworkdir: str, radosuser_admin: rwm.Stor
 def test_locks(tmpworkdir: str):  # pylint: disable=unused-argument
     """test LockManager"""
 
-    lock_path = "./test.lock"
+    lock_path = f"{tmpworkdir}/rwm.lock"
     locker1 = rwm.LockManager(lock_path)
     locker1.lock()
 

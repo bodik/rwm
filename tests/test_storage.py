@@ -134,7 +134,8 @@ def test_storage_backup_usage(
         "restic_password": "dummydummydummydummy",
         "backups": {
             "dummy": {"filesdirs": ["testdir"]}
-        }
+        },
+        "lock_path": f"{tmpworkdir}/rwm.lock",
     })
     assert trwm.restic_cmd(["init"]).returncode == 0
     assert trwm.backup("dummy") == 0
