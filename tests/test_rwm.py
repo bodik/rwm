@@ -210,8 +210,16 @@ def test_backup_error_handling(tmpworkdir: str):  # pylint: disable=unused-argum
     mock_ok = Mock(return_value=0)
     mock_fail = Mock(return_value=11)
 
+    # when lock fails
+    with (
+        patch.object(rwm.LockManager, "lock", mock_fail),
+    ):
+        assert rwm.RWM(rwm_conf).backup("dummycfg") == 1
+
+    # when invalid selector
     assert rwm.RWM(rwm_conf).backup("invalidselector") == 1
 
+    # when backup fails (also triggers warnings)
     with (
         patch.object(rwm.StorageManager, "storage_check_policy", mock_false),
         patch.object(rwm.StorageManager, "storage_check_selfowned", mock_true),
@@ -220,6 +228,7 @@ def test_backup_error_handling(tmpworkdir: str):  # pylint: disable=unused-argum
     ):
         assert rwm.RWM(rwm_conf).backup("dummycfg") == 11
 
+    # when forget fails
     with (
         patch.object(rwm.StorageManager, "storage_check_policy", mock_true),
         patch.object(rwm.StorageManager, "storage_check_selfowned", mock_false),
@@ -229,6 +238,7 @@ def test_backup_error_handling(tmpworkdir: str):  # pylint: disable=unused-argum
     ):
         assert rwm.RWM(rwm_conf).backup("dummycfg") == 11
 
+    # when save state fails
     with (
         patch.object(rwm.StorageManager, "storage_check_policy", mock_true),
         patch.object(rwm.StorageManager, "storage_check_selfowned", mock_false),
@@ -379,3 +389,16 @@ def test_storage_restore_state_restic(tmpworkdir: str, radosuser_admin: rwm.Stor
     assert len(snapshot_files) == 1
     assert "/testdatadir/testdata1.txt" == snapshot_files[0]
     assert trwm_restore.restic_cmd(["check"]).returncode == 0
+
+
+def test_locks(tmpworkdir: str):  # pylint: disable=unused-argument
+    """test LockManager"""
+
+    lock_path = "./test.lock"
+    locker1 = rwm.LockManager(lock_path)
+    locker1.lock()
+
+    locker2 = rwm.LockManager(lock_path)
+    assert locker2.lock() == 1
+
+    locker1.unlock()
