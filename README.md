@@ -17,7 +17,7 @@ S3 provides robust data protection with features like versioning and object
 locking (WORM). When versioning is enabled on a bucket, any updates to objects
 are stored as new versions. Access permissions for manipulating objects and
 versions can be finely controlled through access policies, allowing delegation
-to access keys or users with precise granularity.
+to users with precise granularity.
 
 RWM supports the standard restic backup process. For each backup performed, it
 records the final bucket state, including all objects and their latest version
@@ -101,7 +101,7 @@ Two S3 accounts in the same tenant are required (*admin*, *user1*)
 # create storage
 cp examples/rwm-admin.conf admin.conf
 rwm --confg admin.conf storage-list
-rwm --confg admin.conf storage-create bucket1 user1
+rwm --confg admin.conf storage-create bucket1 target_username
 
 # do backups
 cp examples/rwm-backups.conf rwm.conf
@@ -114,7 +114,8 @@ rwm restic mount /mnt/restore
 rwm --confg admin.conf storage-drop-versions bucket1
 
 # if storage gets corrupted, state can be restored to other bucket
-rwm --confg admin.conf storage-info bucket1  # select existing state file from here
+## select existing state file from storage-info
+rwm --confg admin.conf storage-info bucket1
 rwm --confg admin.conf storage-restore-state bucket1 bucket1-restore rwm/state_[timestamp].json.gz
 ```
 
@@ -165,12 +166,13 @@ rwm restic mount /mnt/restore
     * `project_backedresource2`
     * ...
 
-    Add these identities as members of the project_backup group.
+    Add these identities as members of the `project_backup` group.
 
 4. Generate S3 access credentials for each identity through the DS web portal.
 
 5. Utilize the `project_admin` identity to create policed storage buckets. Note
-   that bucket names cannot be changed once created.
+   that bucket names cannot be changed once created. Bucket target_username is
+   DU S3 username assigned by Gatekeeper, not an E-INFRA login.
 
 6. Perform backups using the designated resource identities
    (`project_backedresource1` and `project_backedresource2`).
@@ -190,7 +192,7 @@ make coverage lint
 ```
 
 
-## Gitlab Runner
+### Gitlab Runner
 
 ```
 git clone https://gitlab.cesnet.cz/radoslav_bodo/rwm.git /opt/rwm
