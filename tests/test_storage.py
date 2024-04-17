@@ -232,3 +232,20 @@ def test_storage_save_state_error_handling(tmpworkdir: str):  # pylint: disable=
     mock = Mock(side_effect=TypeError("dummy"))
     with patch.object(rwm.StorageManager, "_bucket_state", mock):
         assert rwm.StorageManager("http://localhost", "", "").storage_save_state("dummy") == 1
+
+
+@pytest.mark.skipif('PYTEST_SLOW' not in os.environ, reason='slow on devnode, runs in CI')
+def test_storage_delete(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+    """test storage delete"""
+
+    bucket_name = "testbuckx"
+    bucket = radosuser_admin.storage_create(bucket_name, "dummy")
+
+    bucket.upload_fileobj(BytesIO(b"dummydata0"), "dummykey")
+    for idx in range(803):
+        bucket.Object("dummykey").delete()
+        bucket.upload_fileobj(BytesIO(f"dummydata{idx}".encode()), "dummykey")
+
+    assert radosuser_admin.storage_delete(bucket.name) == 0
+
+    assert not radosuser_admin.bucket_exist(bucket.name)

@@ -273,10 +273,36 @@ class StorageManager:
     def storage_delete(self, bucket_name):
         """storage delete"""
 
-        bucket = self.s3.Bucket(bucket_name)
-        bucket.objects.all().delete()
-        bucket.object_versions.all().delete()
-        bucket.delete()
+        # delete all objects
+        paginator = self.s3.meta.client.get_paginator('list_objects')
+        objects = []
+        for page in paginator.paginate(Bucket=bucket_name):
+            for item in page.get("Contents", []):
+                objects.append((bucket_name, item["Key"]))
+        for item in objects:
+            self.s3.Object(*item).delete()
+
+        paginator = self.s3.meta.client.get_paginator('list_object_versions')
+
+        # delete all object versions
+        objects = []
+        for page in paginator.paginate(Bucket=bucket_name):
+            for item in page.get("Versions", []):
+                objects.append((bucket_name, item["Key"], item["VersionId"]))
+        for item in objects:
+            self.s3.ObjectVersion(*item).delete()
+
+        # delete all delete markers
+        objects = []
+        for page in paginator.paginate(Bucket=bucket_name):
+            for item in page.get("DeleteMarkers", []):
+                objects.append((bucket_name, item["Key"], item["VersionId"]))
+        for item in objects:
+            self.s3.ObjectVersion(*item).delete()
+
+        # delete bucket
+        self.s3.Bucket(bucket_name).delete()
+
         return 0
 
     @staticmethod
