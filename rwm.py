@@ -23,7 +23,7 @@ from pydantic import BaseModel, ConfigDict
 from tabulate import tabulate
 
 
-__version__ = "1.0"
+__version__ = "1.1"
 logger = logging.getLogger("rwm")
 logger.setLevel(logging.INFO)
 
