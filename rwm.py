@@ -79,6 +79,9 @@ class BackupConfig(BaseModel):
         excludes:
             List of patterns for `--exclude` options for `restic backup` commmand. Defaults to an empty list.
 
+        tags:
+            List of tags for the new backup snapshot. Defaults to an empty list.
+
         extras:
             Additional options for the `restic backup` commmand. Defaults to an empty list.
 
@@ -93,6 +96,7 @@ class BackupConfig(BaseModel):
 
     filesdirs: List[str]
     excludes: List[str] = []
+    tags: List[str] = []
     extras: List[str] = []
     prerun: List[str] = []
     postrun: List[str] = []
@@ -552,10 +556,16 @@ class RWM:
 
         logger.info(f"_restic_backup {name}")
         conf = self.config.backups[name]
+
         excludes = []
         for item in conf.excludes:
             excludes += ["--exclude", item]
-        cmd_args = ["backup"] + conf.extras + excludes + conf.filesdirs
+
+        tags = []
+        for item in conf.tags:
+            tags += ["--tag", item]
+
+        cmd_args = ["backup"] + conf.extras + tags + excludes + conf.filesdirs
 
         wrap_output(backup_proc := self.restic_cmd(cmd_args))
         return backup_proc.returncode

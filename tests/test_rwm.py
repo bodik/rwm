@@ -128,7 +128,8 @@ def test_backup(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-arg
             "testcfg": {
                 "filesdirs": ["testdatadir/"],
                 "excludes": ["testfile_to_be_ignored"],
-                "extras": ["--tag", "dummytag"],
+                "tags": ["dummytag"],
+                "extras": ["--one-file-system"],
             }
         },
         "retention": {
