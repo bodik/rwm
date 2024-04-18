@@ -430,32 +430,32 @@ class StorageManager:
         # ? lock repo
 
         # drop all saved rwm states
-        paginator = self.s3.meta.client.get_paginator('list_objects')
+        paginator = self.s3client.get_paginator('list_objects')
         objects = []
         for page in paginator.paginate(Bucket=bucket_name, Prefix="rwm/"):
             for item in page.get("Contents", []):
-                objects.append((bucket_name, item["Key"]))
-        for item in objects:
-            self.s3.Object(*item).delete()
+                objects.append({"Key": item["Key"]})
+        for items in batched_iterator(objects, self.bulk_size):
+            self.s3client.delete_objects(Bucket=bucket_name, Delete={'Objects': items, 'Quiet': True})
 
-        paginator = self.s3.meta.client.get_paginator('list_object_versions')
+        paginator = self.s3client.get_paginator('list_object_versions')
 
         # drop all active object versions
         objects = []
         for page in paginator.paginate(Bucket=bucket_name):
             for item in page.get("Versions", []):
                 if not item["IsLatest"]:
-                    objects.append((bucket_name, item["Key"], item["VersionId"]))
-        for item in objects:
-            self.s3.ObjectVersion(*item).delete()
+                    objects.append({"Key": item["Key"], "VersionId": item["VersionId"]})
+        for items in batched_iterator(objects, self.bulk_size):
+            self.s3client.delete_objects(Bucket=bucket_name, Delete={'Objects': items, 'Quiet': True})
 
         # drop all delete markers
         objects = []
         for page in paginator.paginate(Bucket=bucket_name):
             for item in page.get("DeleteMarkers", []):
-                objects.append((bucket_name, item["Key"], item["VersionId"]))
-        for item in objects:
-            self.s3.ObjectVersion(*item).delete()
+                objects.append({"Key": item["Key"], "VersionId": item["VersionId"]})
+        for items in batched_iterator(objects, self.bulk_size):
+            self.s3client.delete_objects(Bucket=bucket_name, Delete={'Objects': items, 'Quiet': True})
 
         # save current state
         ret = self.storage_save_state(bucket_name)
