@@ -178,6 +178,25 @@ def test_storage_info(
     assert radosuser_admin.storage_info(bucket_name)["delete_markers"] == 1
 
 
+def test_storage_state(
+    tmpworkdir: str,
+    radosuser_admin: rwm.StorageManager,
+):  # pylint: disable=unused-argument
+    """test manager storage state"""
+
+    bucket_name = "rwmbackup-test1"
+    target_username = "test1"
+
+    bucket = radosuser_admin.storage_create(bucket_name, target_username)
+    bucket.upload_fileobj(BytesIO(b"dummydata1"), "dummykey")
+    bucket.upload_fileobj(BytesIO(b"dummydata1"), "dummykey1")
+    bucket.Object("dummykey1").delete()
+
+    state = radosuser_admin.storage_state(bucket_name)
+    assert len(state["versions"]) == 2
+    assert len(state["delete_markers"]) == 1
+
+
 def test_storage_drop_versions(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
     """test manager storage_drop_versions"""
 
@@ -230,7 +249,7 @@ def test_storage_save_state_error_handling(tmpworkdir: str):  # pylint: disable=
     """test storage_save_state error handling"""
 
     mock = Mock(side_effect=TypeError("dummy"))
-    with patch.object(rwm.StorageManager, "_bucket_state", mock):
+    with patch.object(rwm.StorageManager, "storage_state", mock):
         assert rwm.StorageManager("http://localhost", "", "").storage_save_state("dummy") == 1
 
 

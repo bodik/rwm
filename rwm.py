@@ -462,7 +462,7 @@ class StorageManager:
 
         return ret
 
-    def _bucket_state(self, bucket_name):
+    def storage_state(self, bucket_name):
         """dumps current bucket state into dict"""
 
         state = {
@@ -488,7 +488,7 @@ class StorageManager:
 
         # explicit error handling here, it's used during backup process
         try:
-            bucket_state = self._bucket_state(bucket_name)
+            bucket_state = self.storage_state(bucket_name)
             now = datetime.now().astimezone().isoformat()
             self.s3.Bucket(bucket_name).upload_fileobj(
                 BytesIO(gzip.compress(json.dumps(bucket_state, cls=RwmJSONEncoder).encode())),
@@ -741,6 +741,16 @@ class RWM:
 
         return 0
 
+    def storage_state(self, bucket_name) -> int:
+        """dump storage state in json"""
+
+        print(json.dumps(
+            self.storage_manager.storage_state(bucket_name),
+            indent=4,
+            cls=RwmJSONEncoder
+        ))
+        return 0
+
     def storage_drop_versions(self, bucket_name) -> int:
         """storage_drop_versions command"""
 
@@ -798,6 +808,9 @@ def parse_arguments(argv):
 
     storage_info_cmd_parser = subparsers.add_parser("storage-info", help="show detailed storage info")
     storage_info_cmd_parser.add_argument("bucket_name", help="bucket name")
+
+    storage_state_cmd_parser = subparsers.add_parser("storage-state", help="dump current storage state")
+    storage_state_cmd_parser.add_argument("bucket_name", help="bucket name")
 
     storage_drop_versions_cmd_parser = subparsers.add_parser(
         "storage-drop-versions",
@@ -872,6 +885,9 @@ def main(argv=None):  # pylint: disable=too-many-branches
 
     if args.command == "storage-info":
         ret = rwmi.storage_info(args.bucket_name)
+
+    if args.command == "storage-state":
+        ret = rwmi.storage_state(args.bucket_name)
 
     if args.command == "storage-drop-versions":
         ret = rwmi.storage_drop_versions(args.bucket_name)

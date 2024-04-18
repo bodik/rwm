@@ -65,6 +65,9 @@ def test_main():
     with patch.object(rwm.RWM, "storage_info", mock_ok):
         assert _rwm_minconfig(["storage-info", "dummy"]) == 0
 
+    with patch.object(rwm.RWM, "storage_state", mock_ok):
+        assert _rwm_minconfig(["storage-state", "dummy"]) == 0
+
     with patch.object(rwm.RWM, "storage_drop_versions", mock_ok):
         assert _rwm_minconfig(["storage-drop-versions", "bucket"]) == 0
 

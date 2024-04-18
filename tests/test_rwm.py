@@ -328,6 +328,19 @@ def test_storage_info(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  # 
     assert trwm.storage_info("dummy") == 0
 
 
+def test_storage_state(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  # pylint: disable=unused-argument
+    """test storage_state"""
+
+    trwm = rwm.RWM({
+        "s3_endpoint_url": radosuser_admin.url,
+        "s3_access_key": radosuser_admin.access_key,
+        "s3_secret_key": radosuser_admin.secret_key,
+    })
+
+    trwm.storage_create("dummy", "dummy")
+    assert trwm.storage_state("dummy") == 0
+
+
 def test_storage_drop_versions(tmpworkdir: str):  # pylint: disable=unused-argument
     """test storage drop versions"""
 
