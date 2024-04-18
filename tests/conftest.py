@@ -58,14 +58,19 @@ def microceph():
 def radosuser(microceph_url, username, tenant="tenant1"):
     """rgwuser fixture"""
 
+    radosgwadmin_bin = shutil.which(
+        "radosgw-admin",
+        path=os.pathsep.join([os.environ["PATH"], "/snap/bin"])
+    )
+
     subprocess.run(
-        ["/snap/bin/radosgw-admin", "user", "rm", f"--uid={tenant}${username}", "--purge-data", "--purge-keys"],
+        [radosgwadmin_bin, "user", "rm", f"--uid={tenant}${username}", "--purge-data", "--purge-keys"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False
     )
     proc = subprocess.run(
-        ["/snap/bin/radosgw-admin", "user", "create", f"--uid={tenant}${username}", f"--display-name={tenant}_{username}"],
+        [radosgwadmin_bin, "user", "create", f"--uid={tenant}${username}", f"--display-name={tenant}_{username}"],
         check=True,
         capture_output=True,
         text=True,
@@ -74,7 +79,7 @@ def radosuser(microceph_url, username, tenant="tenant1"):
     user = json.loads(proc.stdout)
     yield StorageManager(microceph_url, user["keys"][0]["access_key"], user["keys"][0]["secret_key"])
 
-    subprocess.run(["/snap/bin/radosgw-admin", "user", "rm", f"--uid={tenant}${username}", "--purge-data", "--purge-keys"], check=True)
+    subprocess.run([radosgwadmin_bin, "user", "rm", f"--uid={tenant}${username}", "--purge-data", "--purge-keys"], check=True)
 
 
 @pytest.fixture
