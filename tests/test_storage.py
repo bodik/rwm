@@ -242,10 +242,10 @@ def test_storage_delete(tmpworkdir: str, radosuser_admin: rwm.StorageManager):  
     bucket = radosuser_admin.storage_create(bucket_name, "dummy")
 
     bucket.upload_fileobj(BytesIO(b"dummydata0"), "dummykey")
-    for idx in range(803):
+    for idx in range(int(os.environ.get("ROUNDS", 803))):
         bucket.Object("dummykey").delete()
         bucket.upload_fileobj(BytesIO(f"dummydata{idx}".encode()), "dummykey")
+        bucket.upload_fileobj(BytesIO(f"dummydata{idx}".encode()), f"dummykey{idx}")
 
     assert radosuser_admin.storage_delete(bucket.name) == 0
-
     assert not radosuser_admin.bucket_exist(bucket.name)
