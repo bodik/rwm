@@ -133,10 +133,20 @@ class RWMConfig(BaseModel):
 
         retention:
             Dictionary containing retention policies for Restic repository.
-            Keys and values corresponds to a `restic forget` command `--keep*` options without leading dashes.
+            Keys and values corresponds to a `restic forget` command `--keep*`
+            options without leading dashes.
 
         lock_path:
-            Path for parallel execution exclusion lock. Defaults to `/var/run/rwm.lock`.
+            Path for parallel execution exclusion lock. Defaults to
+            `/var/run/rwm.lock`.
+
+        autotags:
+            Automatically add a tag to each backup snapshot, using the value
+            of the backup configuration name.
+
+        backup_extras:
+            Additional options for any the `restic backup` commmand (eg. default `pack-size` setting).
+            Defaults to an empty list.
     """
 
     model_config = ConfigDict(extra='forbid')
@@ -149,6 +159,8 @@ class RWMConfig(BaseModel):
     backups: Dict[str, BackupConfig] = {}
     retention: Dict[str, str] = {}
     lock_path: str = "/var/run/rwm.lock"
+    autotags: bool = False
+    backup_extras: List[str] = []
 
 
 class RwmJSONEncoder(json.JSONEncoder):
@@ -592,15 +604,24 @@ class RWM:
         logger.info(f"_restic_backup {name}")
         conf = self.config.backups[name]
 
+        tags = []
+        if self.config.autotags:
+            tags += ["--tag", name]
+        for item in conf.tags:
+            tags += ["--tag", item]
+
         excludes = []
         for item in conf.excludes:
             excludes += ["--exclude", item]
 
-        tags = []
-        for item in conf.tags:
-            tags += ["--tag", item]
-
-        cmd_args = ["backup"] + conf.extras + tags + excludes + conf.filesdirs
+        cmd_args = [
+            "backup",
+            *self.config.backup_extras,
+            *conf.extras,
+            *tags,
+            *excludes,
+            *conf.filesdirs
+        ]
 
         wrap_output(backup_proc := self.restic_cmd(cmd_args))
         return backup_proc.returncode

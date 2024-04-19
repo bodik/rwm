@@ -136,6 +136,8 @@ def test_backup(tmpworkdir: str, motoserver: str):  # pylint: disable=unused-arg
             "keep-daily": "1"
         },
         "lock_path": f"{tmpworkdir}/rwm.lock",
+        "autotags": True,
+        "backup_extras": ["--quiet", "false"]  # dummy here
     })
 
     Path("testdatadir").mkdir()
