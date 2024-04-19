@@ -10,7 +10,7 @@ import subprocess
 import sys
 from argparse import ArgumentParser
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from fcntl import flock, LOCK_EX, LOCK_NB, LOCK_UN
 from io import BytesIO
 from pathlib import Path
@@ -673,6 +673,7 @@ class RWM:
 
         if self.cronlock.lock():
             return 1
+        backup_time_start = datetime.now()
 
         stats = []
         ret = 0
@@ -689,26 +690,31 @@ class RWM:
 
         for name in selected_backups:
             time_start = datetime.now()
-            backup_ret = self._backup_one(name)
+            last_ret = self._backup_one(name)
             time_end = datetime.now()
-            ret |= backup_ret
-            stats.append(BackupResult(name, backup_ret, time_start, time_end))
+            ret |= last_ret
+            stats.append(BackupResult(name, last_ret, time_start, time_end))
 
         if ret == 0:
             time_start = datetime.now()
-            forget_ret = self._restic_forget_prune()
+            last_ret = self._restic_forget_prune()
             time_end = datetime.now()
-            ret |= forget_ret
-            stats.append(BackupResult("_forget_prune", forget_ret, time_start, time_end))
+            ret |= last_ret
+            stats.append(BackupResult("_forget_prune", last_ret, time_start, time_end))
 
         time_start = datetime.now()
-        save_state_ret = self.storage_manager.storage_save_state(self.config.restic_bucket)
+        last_ret = self.storage_manager.storage_save_state(self.config.restic_bucket)
         time_end = datetime.now()
-        ret |= save_state_ret
-        stats.append(BackupResult("_storage_save_state", save_state_ret, time_start, time_end))
+        ret |= last_ret
+        stats.append(BackupResult("_storage_save_state", last_ret, time_start, time_end))
 
         logger.info("backup results")
         print(tabulate([item.to_dict() for item in stats], headers="keys", numalign="left"))
+
+        backup_time_end = datetime.now()
+        took = timedelta(seconds=(backup_time_end - backup_time_start).seconds)  # drops microseconds
+        severity, result = (logging.INFO, "success") if ret == 0 else (logging.ERROR, "errors")
+        logger.log(severity, f"backup finished with {result} (ret {ret}), took {took} ({round(took.total_seconds())} sec)")
 
         self.cronlock.unlock()
         return ret
@@ -887,13 +893,9 @@ def main(argv=None):  # pylint: disable=too-many-branches
 
     if args.command == "backup":
         ret = rwmi.backup(args.name)
-        severity, result = (logging.INFO, "success") if ret == 0 else (logging.ERROR, "errors")
-        logger.log(severity, f"backup finished with {result} (ret {ret})")
 
     if args.command == "backup-all":
         ret = rwmi.backup_all()
-        severity, result = (logging.INFO, "success") if ret == 0 else (logging.ERROR, "errors")
-        logger.log(severity, f"backup-all finished with {result} (ret {ret})")
 
     if args.command == "storage-create":
         ret = rwmi.storage_create(args.bucket_name, args.target_username)
