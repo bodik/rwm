@@ -6,7 +6,7 @@ umask 077
 LOGFILE="/var/log/rwm/cron.log.$(date +'%Y-%m-%dT%H:%M:%S%z')"
 mkdir -p "$(dirname "$LOGFILE")"
 
-/opt/rwm/rwm.py --config /etc/rwm.yml backup-all 1>"$LOGFILE" 2>&1
+/opt/rwm/rwm.py --config /etc/rwm.conf backup-all 1>"$LOGFILE" 2>&1
 RET=$?
 
 if [ $RET = 0 ]; then
