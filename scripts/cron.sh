@@ -16,3 +16,4 @@ else
 fi
 # shellcheck disable=SC2002
 cat "$LOGFILE" | mail -E -s "rwm backup-all $RESULT" $USER
+exit $RET
