@@ -141,6 +141,15 @@ rwm restic snapshots
 rwm restic mount /mnt/restore
 ```
 
+### Restore PostgreSQL backup
+
+```
+# Using script for the whole archive
+scripts/restore_postgresql.sh postgresql.tar.gz
+
+# For individual dumps
+createdb database_name && gunzip -c database_name.sql.gz | psql -d database_name
+```
 
 ## Notes
 
