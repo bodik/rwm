@@ -16,4 +16,7 @@ else
 fi
 # shellcheck disable=SC2002
 cat "$LOGFILE" | mail -E -s "rwm backup-all $RESULT" $USER
+
+find /var/log/rwm -type f -mtime +90 -exec rm {} \;
+
 exit $RET
