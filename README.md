@@ -114,9 +114,9 @@ rwm restic mount /mnt/restore
 rwm --confg admin.conf storage-drop-versions bucket1
 
 # if storage gets corrupted, state can be restored to other bucket
-## select existing state file from storage-info
+## select existing state and version from storage-info
 rwm --confg admin.conf storage-info bucket1
-rwm --confg admin.conf storage-restore-state bucket1 bucket1-restore rwm/state_[timestamp].json.gz
+rwm --confg admin.conf storage-restore-state bucket1 bucket1-restore rwm/state_[timestamp].json.gz versionid
 ```
 
 

@@ -427,9 +427,8 @@ class StorageManager:
                     result["old_size"] += obj["Size"]
             result["delete_markers"] += len(page.get("DeleteMarkers", []))
 
-        paginator = self.s3.meta.client.get_paginator('list_objects')
         for page in paginator.paginate(Bucket=bucket_name, Prefix="rwm/"):
-            result["saved_states"] += [x["Key"] for x in page.get("Contents", [])]
+            result["saved_states"] += [(x["Key"], x["VersionId"]) for x in page.get("Versions", [])]
 
         return result
 
@@ -512,11 +511,11 @@ class StorageManager:
 
         return 0
 
-    def storage_restore_state(self, source_bucket_name, target_bucket_name, state_object_key):
+    def storage_restore_state(self, source_bucket_name, target_bucket_name, state_object_key, state_version):
         """create new bucket, copy data by selected state_file"""
 
         target_bucket = self.storage_create(target_bucket_name, "dummy")
-        resp = self.s3.Bucket(source_bucket_name).Object(state_object_key).get()
+        resp = self.s3.Bucket(source_bucket_name).Object(state_object_key).get(VersionId=state_version)
         state = json.loads(gzip.decompress(resp['Body'].read()))
 
         for obj in state["versions"]:
@@ -764,7 +763,7 @@ class RWM:
         print(json.dumps(sinfo["policy"], indent=2))
         print("----------------------------------------")
         print("RWM saved states:")
-        print("\n".join(sorted(sinfo["saved_states"])))
+        print("\n".join([f"{key} {ver}" for key, ver in sorted(sinfo["saved_states"])]))
 
         return 0
 
@@ -783,10 +782,10 @@ class RWM:
 
         return self.storage_manager.storage_drop_versions(bucket_name)
 
-    def storage_restore_state(self, source_bucket, target_bucket, state_object_key) -> int:
+    def storage_restore_state(self, source_bucket, target_bucket, state_object_key, state_version) -> int:
         """storage restore state"""
 
-        return self.storage_manager.storage_restore_state(source_bucket, target_bucket, state_object_key)
+        return self.storage_manager.storage_restore_state(source_bucket, target_bucket, state_object_key, state_version)
 
 
 def configure_logging(debug):
@@ -849,6 +848,7 @@ def parse_arguments(argv):
     storage_restore_state_cmd_parser.add_argument("source_bucket", help="source_bucket")
     storage_restore_state_cmd_parser.add_argument("target_bucket", help="target_bucket; should not exist")
     storage_restore_state_cmd_parser.add_argument("state", help="state object key in source bucket")
+    storage_restore_state_cmd_parser.add_argument("version", help="state object version in source bucket")
 
     return parser.parse_args(argv)
 
@@ -916,7 +916,7 @@ def main(argv=None):  # pylint: disable=too-many-branches
         ret = rwmi.storage_drop_versions(args.bucket_name)
 
     if args.command == "storage-restore-state":
-        ret = rwmi.storage_restore_state(args.source_bucket, args.target_bucket, args.state)
+        ret = rwmi.storage_restore_state(args.source_bucket, args.target_bucket, args.state, args.version)
 
     logger.debug("finished with %s (ret %d)", "success" if ret == 0 else "errors", ret)
     return ret

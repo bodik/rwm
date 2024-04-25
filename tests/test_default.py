@@ -72,7 +72,7 @@ def test_main():
         assert _rwm_minconfig(["storage-drop-versions", "bucket"]) == 0
 
     with patch.object(rwm.RWM, "storage_restore_state", mock_ok):
-        assert _rwm_minconfig(["storage-restore-state", "bucket", "bucket", "state"]) == 0
+        assert _rwm_minconfig(["storage-restore-state", "bucket", "bucket", "state", "version"]) == 0
 
     # error handling
     assert rwm_main(["--config", "notexist", "version"]) == 1
