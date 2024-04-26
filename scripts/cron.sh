@@ -15,7 +15,7 @@ else
 	RESULT="ERROR"
 fi
 # shellcheck disable=SC2002
-cat "$LOGFILE" | mail -E -s "rwm backup-all $RESULT" $USER
+cat "$LOGFILE" | mail -E -s "rwm backup-all $RESULT" "$LOGNAME"
 
 find /var/log/rwm -type f -mtime +90 -exec rm {} \;
 
