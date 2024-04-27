@@ -33,7 +33,7 @@ microceph-service:
 	snap install microceph
 	snap refresh --hold microceph
 	/snap/bin/microceph cluster bootstrap
-	/snap/bin/microceph disk add loop,1G,3
+	/snap/bin/microceph disk add loop,4G,3
 	/snap/bin/microceph enable rgw
 	while true; do /snap/bin/ceph status | grep "HEALTH_OK" && break; done
 	# required for gitlab runner shell executor which runs as non-privileged user
