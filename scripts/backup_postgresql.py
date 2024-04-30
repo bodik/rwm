@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """rwm postgresql backup helper"""
 
-import gzip
 import os
 import shutil
 import subprocess
@@ -18,33 +17,39 @@ USERNAME = os.environ.get("PGUSER", "postgres")
 def list_databases():
     """list postgresql databases"""
 
-    cmd = ["psql", "-U", USERNAME, "-h", "127.0.0.1", "-q", "-A", "-t", "-c", "SELECT datname FROM pg_database WHERE datistemplate = false;"]
-
+    cmd = [
+        "su",
+        "-c",
+        'psql -q -A -t -c "SELECT datname FROM pg_database WHERE datistemplate = false;"',
+        USERNAME,
+    ]
     proc = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, text=True)
-
     return proc.stdout.splitlines()
 
 
 def backup_database(database):
-    """backup single database and compress it"""
+    """backup single database"""
 
-    cmd = ["pg_dump", "-U", USERNAME, "-h", "127.0.0.1", database]
-
+    cmd = ["su", "-c", f"pg_dump --clean --create {database}", USERNAME]
     try:
-        with gzip.open(f"{BACKUPDIR}/{database}.sql.gz", "wb") as fd:
-            with subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True) as proc:
-                for stdout_line in iter(proc.stdout.readline, ''):
-                    fd.write(stdout_line.encode('utf-8'))
-
-                # Dumps roles
-                if database == "postgres":
-                    roles_cmd = ["pg_dumpall", "-U", USERNAME, "-h", "127.0.0.1", "--roles-only"]
-                    with subprocess.Popen(roles_cmd, stdout=subprocess.PIPE, universal_newlines=True) as roles_proc:
-                        for stdout_line in iter(roles_proc.stdout.readline, ''):
-                            fd.write(stdout_line.encode('utf-8'))
-
+        with open(f"{BACKUPDIR}/{database}.sql", "wb") as fd:
+            subprocess.run(cmd, stdout=fd, check=True)
     except subprocess.CalledProcessError:
         print(f"ERROR: cannot dump {database}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+def backup_global_data():
+    """backup global data"""
+
+    try:
+        cmd = ["su", "-c", "pg_dumpall --clean --globals-only", USERNAME]
+        with open(f"{BACKUPDIR}/_globals.sql", "wb") as fd:
+            subprocess.run(cmd, stdout=fd, check=True)
+    except subprocess.CalledProcessError:
+        print("ERROR: cannot dump database global data", file=sys.stderr)
         return 1
 
     return 0
@@ -62,6 +67,8 @@ def create():
     for db in list_databases():
         databases += 1
         errors += backup_database(db)
+
+    errors += backup_global_data()
 
     subprocess.run(["tar", "czf", ARCHIVE, BACKUPDIR], check=True)
     shutil.rmtree(BACKUPDIR)

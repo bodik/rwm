@@ -94,6 +94,7 @@ def cleanup():
     return os.unlink(ARCHIVE)
 
 
+# pylint: disable=duplicate-code
 def main():
     """main"""
 
