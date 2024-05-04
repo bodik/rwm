@@ -1,4 +1,15 @@
 #!/bin/bash
+#
+# Restores all databases (might throw errros, see pg docs).
+# Might require to regrant privileges or ownership of created objects.
+#
+# ```
+# \c database
+# GRANT ALL PRIVILEGES ON SCHEMA public TO y;
+# GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO y;
+# GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO y;
+# ```
+`
 set -ex
 umask 077
 
