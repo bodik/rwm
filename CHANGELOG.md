@@ -1,5 +1,13 @@
 # RWM changelog
 
+## 1.2 - Holodeck preserver
+
+* changed: cron, use .conf, propagate return code, prune logs
+* changed: rwm, require to select state version for storage-restore-state
+* changed: microceph, use bigger disk (improves cluster stability)
+* added: postgresql backup scripts (plain and docker version)
+
+
 ## 1.1 - Brahms tuning
 
 * added: storage-state command
