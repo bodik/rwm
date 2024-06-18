@@ -1,5 +1,10 @@
 # RWM changelog
 
+## 1.3 - Pathfinder
+
+* changed: cron use rwm from PATH
+
+
 ## 1.2 - Holodeck preserver
 
 * changed: cron, use .conf, propagate return code, prune logs
